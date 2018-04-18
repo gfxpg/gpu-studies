@@ -1,5 +1,26 @@
 # Matrix multiplication
 
+## Prerequisites
+
+You need OpenCL development files -- headers and libraries -- installed on your system
+to build the program, as well as Python3 and Numpy to run the matrix generation script
+(see below for more details).
+
+## Building
+
+`cmake . && make`
+
+## Running
+
+The program reads input matrices from `matrix_a` and `matrix_b` files, multiplies them,
+and compares the result with the matrix read from `matrix_c`. You can generate these files
+with the included `mkmatrices` script (run `./mkmatrices -h` for usage instructions).
+
+`matrix_mul` expects four arguments: the target OpenCL platform and matrix dimensions.
+The latter should match the dimensions you've passed to `mkmatrices`; to determine
+the former, run `clinfo` and pick your GPU's platform
+(note that `Device OpenCL C Version` should be at least OpenGL 1.2).
+
 ## Gotchas
 
 On Intel's iGPUs, the kernel may not be executed over the full global work range,
