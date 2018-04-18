@@ -6,6 +6,7 @@
 #define DIE(...) ({ fprintf(stderr, __VA_ARGS__); exit(1); })
 #define CHK_CL_ERR(err) ({ if ((err) != CL_SUCCESS) DIE("OpenCL invocation at %s:%i failed with error code %i\n", __FILE__, __LINE__, err); })
 #define HANDLE_CL_ERR(stmt) ({ cl_int err = (stmt); CHK_CL_ERR(err); })
+#define STATIC_ARRAY_SIZE(ary) (sizeof(ary) / sizeof((ary)[0]))
 
 cl_device_id cl_device(const char* platform_name) {
     cl_uint platform_count;
@@ -64,7 +65,34 @@ void read_matrix(const char* file_name, float* matrix, size_t matrix_size) {
     fclose(matrix_file);
 }
 
-int main(int argc, char *argv[]) {
+void print_kernel_profiling_info(cl_event kernel_exec) {
+    cl_ulong time_queued;
+    cl_ulong time_start;
+    cl_ulong time_end;
+
+    HANDLE_CL_ERR(clGetEventProfilingInfo(kernel_exec, CL_PROFILING_COMMAND_QUEUED, sizeof(time_queued), &time_queued, NULL));
+    HANDLE_CL_ERR(clGetEventProfilingInfo(kernel_exec, CL_PROFILING_COMMAND_START, sizeof(time_start), &time_start, NULL));
+    HANDLE_CL_ERR(clGetEventProfilingInfo(kernel_exec, CL_PROFILING_COMMAND_END, sizeof(time_end), &time_end, NULL));
+
+    printf("Kernel execution time is %f [ms]\n", ((double) time_end - time_start) / 1000000.0);
+    printf("Time from enqueueing to execution is %f [ms]\n", ((double) time_start - time_queued) / 1000000.0);
+}
+
+void validate_results(const float* expected_matrix, const float* actual_matrix, uint M, uint P) {
+    for (size_t m = 0; m < M; m++) {
+        for (size_t p = 0; p < P; p++) {
+            float expected = expected_matrix[m * M + p];
+            float actual = actual_matrix[m * M + p];
+            /* TODO: implement a proper comparison
+             * refer to https://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition */
+            if (fabsf(expected - actual) > 0.02) {
+                printf("Row %zu, col %zu: expected result is %.8f, actual is %.8f\n", m, p, expected, actual);
+            }
+        }
+    }
+}
+
+int main(int argc, char* argv[]) {
     if (argc != 5) {
         printf("Usage: ./matrix_mul platform m n p, where:"
                "\n    platform is the OpenCL platform used, e.g. \"Intel Gen OCL Driver\""
@@ -73,9 +101,9 @@ int main(int argc, char *argv[]) {
         return 0;
     }
     const char* platform = argv[1];
-    unsigned int M = (unsigned int) strtoul(argv[2], NULL, 10);
-    unsigned int N = (unsigned int) strtoul(argv[3], NULL, 10);
-    unsigned int P = (unsigned int) strtoul(argv[4], NULL, 10);
+    uint M = (uint) strtoul(argv[2], NULL, 10);
+    uint N = (uint) strtoul(argv[3], NULL, 10);
+    uint P = (uint) strtoul(argv[4], NULL, 10);
 
     size_t matrix_a_size = M * N;
     size_t matrix_b_size = N * P;
@@ -90,13 +118,14 @@ int main(int argc, char *argv[]) {
     read_matrix("matrix_b", matrix_b, N * P);
     read_matrix("matrix_c", matrix_c_expected, M * P);
 
+    /* TODO: tiled.cl requires the matrix to be padded to a multiple of work group size */
+
     cl_int err;
 
     cl_device_id device = cl_device(platform);
     cl_context context = clCreateContext(NULL, 1, &device, NULL, NULL, &err); CHK_CL_ERR(err);
     cl_command_queue commands = clCreateCommandQueueWithProperties(context, device, (cl_queue_properties[])
       { CL_QUEUE_PROPERTIES, CL_QUEUE_PROFILING_ENABLE, 0 }, &err); CHK_CL_ERR(err);
-    cl_kernel kernel = cl_kernel_from_src(context, device, "simple.cl");
 
     cl_mem cl_matrix_a = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(float) * matrix_a_size, NULL, &err); CHK_CL_ERR(err);
     cl_mem cl_matrix_b = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(float) * matrix_b_size, NULL, &err); CHK_CL_ERR(err);
@@ -104,51 +133,47 @@ int main(int argc, char *argv[]) {
 
     HANDLE_CL_ERR(clEnqueueWriteBuffer(commands, cl_matrix_a, CL_TRUE, 0, sizeof(float) * matrix_a_size, matrix_a, 0, NULL, NULL));
     HANDLE_CL_ERR(clEnqueueWriteBuffer(commands, cl_matrix_b, CL_TRUE, 0, sizeof(float) * matrix_b_size, matrix_b, 0, NULL, NULL));
-    HANDLE_CL_ERR(clSetKernelArg(kernel, 0, sizeof(cl_matrix_a), &cl_matrix_a));
-    HANDLE_CL_ERR(clSetKernelArg(kernel, 1, sizeof(cl_matrix_b), &cl_matrix_b));
-    HANDLE_CL_ERR(clSetKernelArg(kernel, 2, sizeof(cl_matrix_c), &cl_matrix_c));
-    HANDLE_CL_ERR(clSetKernelArg(kernel, 3, sizeof(M), &M));
-    HANDLE_CL_ERR(clSetKernelArg(kernel, 4, sizeof(N), &N));
-    HANDLE_CL_ERR(clSetKernelArg(kernel, 5, sizeof(P), &P));
 
-    size_t work_items;
-    HANDLE_CL_ERR(clGetKernelWorkGroupInfo(kernel, device, CL_KERNEL_WORK_GROUP_SIZE, sizeof(work_items), &work_items, NULL));
-    work_items = (size_t) sqrt(work_items); /* work group size is given for _all_ dimensions, we have two */
+    const char* kernels[] = { "simple.cl", "tiled.cl" };
 
-    size_t global_work_size[] = { M, P };
-    size_t local_work_size[] = { work_items, work_items };
-    printf("Global work size: %zu x %zu, local work size: %zu x %zu\n",
-           global_work_size[0], global_work_size[1], local_work_size[0], local_work_size[1]);
+    for (uint k = 0; k < STATIC_ARRAY_SIZE(kernels); k++) {
+        printf("===\n=== %s\n===\n", kernels[k]);
+        cl_kernel kernel = cl_kernel_from_src(context, device, kernels[k]);
 
-    cl_event kernel_exec;
+        for (uint i = 0; i < matrix_c_size; i++) matrix_c_actual[i] = 0;
+        HANDLE_CL_ERR(clEnqueueWriteBuffer(commands, cl_matrix_c, CL_TRUE, 0, sizeof(float) * matrix_c_size, matrix_c_actual, 0, NULL, NULL));
 
-    HANDLE_CL_ERR(clEnqueueNDRangeKernel(commands, kernel, 2, NULL, global_work_size, local_work_size, 0, NULL, &kernel_exec));
-    HANDLE_CL_ERR(clWaitForEvents(1, &kernel_exec));
-    HANDLE_CL_ERR(clFinish(commands));
-    HANDLE_CL_ERR(clEnqueueReadBuffer(commands, cl_matrix_c, CL_TRUE, 0, sizeof(float) * matrix_c_size, matrix_c_actual, 0, NULL, NULL));
+        HANDLE_CL_ERR(clSetKernelArg(kernel, 0, sizeof(cl_matrix_a), &cl_matrix_a));
+        HANDLE_CL_ERR(clSetKernelArg(kernel, 1, sizeof(cl_matrix_b), &cl_matrix_b));
+        HANDLE_CL_ERR(clSetKernelArg(kernel, 2, sizeof(cl_matrix_c), &cl_matrix_c));
+        HANDLE_CL_ERR(clSetKernelArg(kernel, 3, sizeof(M), &M));
+        HANDLE_CL_ERR(clSetKernelArg(kernel, 4, sizeof(N), &N));
+        HANDLE_CL_ERR(clSetKernelArg(kernel, 5, sizeof(P), &P));
 
-    /* Validate results */
-    for (size_t m = 0; m < M; m++) {
-        for (size_t p = 0; p < M; p++) {
-            float expected = matrix_c_expected[m * M + p];
-            float actual = matrix_c_actual[m * M + p];
-            /* TODO: implement a proper comparison
-             * refer to https://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition */
-            if (fabsf(expected - actual) > 0.02) {
-                printf("Row %zu, col %zu: expected result is %.8f, actual is %.8f\n", m, p, expected, actual);
-            }
+        /* Determine global and local work size */
+        size_t work_items;
+        if (kernels[k] == "simple.cl") {
+            HANDLE_CL_ERR(clGetKernelWorkGroupInfo(kernel, device, CL_KERNEL_WORK_GROUP_SIZE, sizeof(work_items), &work_items, NULL));
+            work_items = (size_t) sqrt(work_items); /* work group size is given for _all_ dimensions, we have two */
         }
+        /*else*/ work_items = 20; /* Must match the TILE_SIZE set in the kernel */
+        size_t global_work_size[] = { M, P };
+        size_t local_work_size[] = { work_items, work_items };
+        printf("Global work size: %zu x %zu, local work size: %zu x %zu\n",
+               global_work_size[0], global_work_size[1], local_work_size[0], local_work_size[1]);
+
+        /* Begin execution */
+        cl_event kernel_exec;
+
+        HANDLE_CL_ERR(clEnqueueNDRangeKernel(commands, kernel, 2, NULL, global_work_size, local_work_size, 0, NULL, &kernel_exec));
+        HANDLE_CL_ERR(clWaitForEvents(1, &kernel_exec));
+        HANDLE_CL_ERR(clFinish(commands));
+        HANDLE_CL_ERR(clEnqueueReadBuffer(commands, cl_matrix_c, CL_TRUE, 0, sizeof(float) * matrix_c_size, matrix_c_actual, 0, NULL, NULL));
+
+        int a = 0; for (int i = 0; i < matrix_c_size; i++) if (matrix_c_actual[i] == 0) a++;
+        size_t calculated = matrix_c_size - a;
+
+        validate_results(matrix_c_expected, matrix_c_actual, M, P);
+        print_kernel_profiling_info(kernel_exec);
     }
-
-    /* Print profiling info */
-    cl_ulong time_queued;
-    cl_ulong time_start;
-    cl_ulong time_end;
-
-    HANDLE_CL_ERR(clGetEventProfilingInfo(kernel_exec, CL_PROFILING_COMMAND_QUEUED, sizeof(time_queued), &time_queued, NULL));
-    HANDLE_CL_ERR(clGetEventProfilingInfo(kernel_exec, CL_PROFILING_COMMAND_START, sizeof(time_start), &time_start, NULL));
-    HANDLE_CL_ERR(clGetEventProfilingInfo(kernel_exec, CL_PROFILING_COMMAND_END, sizeof(time_end), &time_end, NULL));
-
-    printf("Kernel execution time is %f [ms]\n", ((double) time_end - time_start) / 1000000.0);
-    printf("Time from enqueueing to execution is %f [ms]\n", ((double) time_start - time_queued) / 1000000.0);
 }
