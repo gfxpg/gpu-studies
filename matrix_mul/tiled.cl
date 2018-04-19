@@ -61,10 +61,6 @@ __kernel void tiled(const __global float* A,
         for (size_t n = 0; n < TILE_SIZE; n++)
             c_acc += current_a_tile[row][n] * current_b_tile[n][col];
 
-        if (tile_row == 0 && tile_col == 0 && tile == 100) {
-            c_acc += 0.000001;
-        }
-
         /* Wait for all work items to finish reading current tiles before loading the next ones */
         barrier(CLK_LOCAL_MEM_FENCE);
     }

@@ -97,7 +97,8 @@ int main(int argc, char* argv[]) {
         printf("Usage: ./matrix_mul platform m n p, where:"
                "\n    platform is the OpenCL platform used, e.g. \"Intel Gen OCL Driver\""
                "\n    m-by-n specifies the dimensions of matrix A"
-               "\n    n-by-p specifies the dimensions of matrix B");
+               "\n    n-by-p specifies the dimensions of matrix B"
+               "\n");
         return 0;
     }
     const char* platform = argv[1];
