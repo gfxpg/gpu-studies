@@ -55,17 +55,23 @@ Results:
 
 ```
 ===
-=== tiled.cl
-===
-Global work size: 5000 x 5000, local work size: 20 x 20
-Kernel execution time is 13035.612320 [ms]
-Time from enqueueing to execution is 11.710560 [ms]
-===
 === simple.cl
 ===
 Global work size: 5000 x 5000, local work size: 20 x 20
-Kernel execution time is 41476.164800 [ms]
-Time from enqueueing to execution is 0.092880 [ms]
+Kernel execution time is 41404.842160 [ms]
+Time from enqueueing to execution is 12.298400 [ms]
+===
+=== tiled.cl
+===
+Global work size: 5000 x 5000, local work size: 20 x 20
+Kernel execution time is 12454.067840 [ms]
+Time from enqueueing to execution is 0.337280 [ms]
+===
+=== wideloads.cl
+===
+Global work size: 5000 x 1250, local work size: 20 x 5
+Kernel execution time is 5979.897520 [ms]
+Time from enqueueing to execution is 0.324720 [ms]
 ```
 
 ### NVIDIA
@@ -85,15 +91,22 @@ Results:
 
 ```
 ===
-=== tiled.cl
-===
-Global work size: 5000 x 5000, local work size: 20 x 20
-Kernel execution time is 910.439168 [ms]
-Time from enqueueing to execution is 0.008960 [ms]
-===
 === simple.cl
 ===
 Global work size: 5000 x 5000, local work size: 20 x 20
-Kernel execution time is 5226.043392 [ms]
-Time from enqueueing to execution is 0.007936 [ms]
+Kernel execution time is 5195.240448 [ms]
+Time from enqueueing to execution is 0.008960 [ms]
+===
+
+=== tiled.cl
+===
+Global work size: 5000 x 5000, local work size: 20 x 20
+Kernel execution time is 736.579584 [ms]
+Time from enqueueing to execution is 0.007424 [ms]
+===
+=== wideloads.cl
+===
+Global work size: 5000 x 1250, local work size: 20 x 5
+Kernel execution time is 284.452864 [ms]
+Time from enqueueing to execution is 0.006656 [ms]
 ```

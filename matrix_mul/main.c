@@ -135,7 +135,7 @@ int main(int argc, char* argv[]) {
     HANDLE_CL_ERR(clEnqueueWriteBuffer(commands, cl_matrix_a, CL_TRUE, 0, sizeof(float) * matrix_a_size, matrix_a, 0, NULL, NULL));
     HANDLE_CL_ERR(clEnqueueWriteBuffer(commands, cl_matrix_b, CL_TRUE, 0, sizeof(float) * matrix_b_size, matrix_b, 0, NULL, NULL));
 
-    const char* kernels[] = { "simple.cl", "tiled.cl" };
+    const char* kernels[] = { "simple.cl", "tiled.cl", "wideloads.cl" };
 
     for (uint k = 0; k < STATIC_ARRAY_SIZE(kernels); k++) {
         printf("===\n=== %s\n===\n", kernels[k]);
@@ -151,19 +151,18 @@ int main(int argc, char* argv[]) {
         HANDLE_CL_ERR(clSetKernelArg(kernel, 4, sizeof(N), &N));
         HANDLE_CL_ERR(clSetKernelArg(kernel, 5, sizeof(P), &P));
 
-        /* Determine global and local work size */
-        size_t work_items;
-        if (kernels[k] == "simple.cl") {
-            HANDLE_CL_ERR(clGetKernelWorkGroupInfo(kernel, device, CL_KERNEL_WORK_GROUP_SIZE, sizeof(work_items), &work_items, NULL));
-            work_items = (size_t) sqrt(work_items); /* work group size is given for _all_ dimensions, we have two */
-        }
-        /*else*/ work_items = 20; /* Must match the TILE_SIZE set in the kernel */
-        size_t global_work_size[] = { M, P };
+        size_t work_items = 20; /* Must match the TILE_SIZE set in the kernel */
         size_t local_work_size[] = { work_items, work_items };
+        size_t global_work_size[] = { M, P };
+
+        if (kernels[k] == "wideloads.cl") {
+            global_work_size[1] = global_work_size[1] / 4;
+            local_work_size[1] = local_work_size[1] / 4;
+        }
+
         printf("Global work size: %zu x %zu, local work size: %zu x %zu\n",
                global_work_size[0], global_work_size[1], local_work_size[0], local_work_size[1]);
 
-        /* Begin execution */
         cl_event kernel_exec;
 
         HANDLE_CL_ERR(clEnqueueNDRangeKernel(commands, kernel, 2, NULL, global_work_size, local_work_size, 0, NULL, &kernel_exec));
