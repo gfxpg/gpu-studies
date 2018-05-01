@@ -21,8 +21,11 @@ __kernel void tiled(const __global float* A,
      *
      * The cells are not individual elements, but rather, _square_ tiles the size of
      * the number of work items in a group. This requires the dimensions of matrices
-     * to be divisible by that number, but that's taken care of on the host. */
-    #define TILE_SIZE 20
+     * to be divisible by that number, but that's taken care of on the host.
+     *
+     * In total, we need to go through (N / TILE_SIZE) sets of tiles -- in
+     * the illustration above, tile_num is 2. */
+    const size_t tile_num = N / TILE_SIZE;
 
     /* A work group fills in a single tile in the C matrix */
     const size_t tile_row = get_group_id(0);
@@ -34,10 +37,6 @@ __kernel void tiled(const __global float* A,
 
     /* The element is accumulated through iterations on A and B matrix tiles */
     float c_acc = 0.0f;
-
-    /* In total, we need to go through (N / TILE_SIZE) sets of tiles -- in
-     * the illustration above, tile_num is 2. */
-    const size_t tile_num = N / TILE_SIZE;
     
     /* The tiles currently being iterated on are shared within a work group:
      * each work item loads a single element from each input matrix, and once

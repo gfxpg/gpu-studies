@@ -4,6 +4,7 @@
 #include "io.h"
 
 #define MAX_PRINT_ERRORS 10
+#define KERNEL_TILE_SIZE_DEFINE "#define TILE_SIZE "
 
 #define DIE(...) ({ fprintf(stderr, __VA_ARGS__); exit(1); })
 #define CHK_CL_ERR(err) ({ if ((err) != CL_SUCCESS) DIE("OpenCL invocation at %s:%i failed with error code %i\n", __FILE__, __LINE__, err); })
@@ -36,13 +37,18 @@ cl_device_id cl_device(const char* platform_name) {
     return device;
 }
 
-cl_kernel cl_kernel_from_src(cl_context context, cl_device_id device, const char* src_file) {
-    char* kernel_src = read_file(src_file);
-    if (!kernel_src) DIE("Unable to load kernel source from %s\n", src_file);
+cl_kernel cl_kernel_from_src(cl_context context, cl_device_id device, uint work_items, const char* src_file) {
+    char* raw_src = read_file(src_file);
+    if (!raw_src) DIE("Unable to load kernel source from %s\n", src_file);
+
+    uint work_items_len = (work_items < 10) ? 1 : ((uint) ceil(log10(work_items)));
+    char kernel_src[strlen(KERNEL_TILE_SIZE_DEFINE) + strlen(raw_src) + work_items_len + /* line feed & null */ 2];
+    sprintf(kernel_src, "%s%d\n%s", KERNEL_TILE_SIZE_DEFINE, work_items, raw_src);
+    const char* kernel_src_ptr = (const char*) &kernel_src;
 
     cl_int err;
 
-    cl_program program = clCreateProgramWithSource(context, 1, (const char**) &kernel_src, NULL, &err); CHK_CL_ERR(err);
+    cl_program program = clCreateProgramWithSource(context, 1, &kernel_src_ptr, NULL, &err); CHK_CL_ERR(err);
     if (clBuildProgram(program, 0, NULL, "-cl-std=CL1.2", NULL, NULL) != CL_SUCCESS) {
         char buffer[2048];
         clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, NULL);
@@ -102,22 +108,24 @@ void validate_results(const float* expected_matrix, const float* actual_matrix, 
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 5) {
-        printf("Usage: ./matrix_mul platform m n p, where:"
+    if (argc != 6) {
+        printf("Usage: ./matrix_mul platform workitems m n p, where:"
                "\n    platform is the OpenCL platform used, e.g. \"Intel Gen OCL Driver\""
+               "\n    workitems is the number of work items (in each dimension) used for computation"
                "\n    m-by-n specifies the dimensions of matrix A"
                "\n    n-by-p specifies the dimensions of matrix B"
                "\n");
         return 0;
     }
     const char* platform = argv[1];
-    uint M = (uint) strtoul(argv[2], NULL, 10);
-    uint N = (uint) strtoul(argv[3], NULL, 10);
-    uint P = (uint) strtoul(argv[4], NULL, 10);
+    const uint work_items = (uint) strtoul(argv[2], NULL, 10);
+    const uint M = (uint) strtoul(argv[3], NULL, 10);
+    const uint N = (uint) strtoul(argv[4], NULL, 10);
+    const uint P = (uint) strtoul(argv[5], NULL, 10);
 
-    size_t matrix_a_size = M * N;
-    size_t matrix_b_size = N * P;
-    size_t matrix_c_size = M * P;
+    const size_t matrix_a_size = M * N;
+    const size_t matrix_b_size = N * P;
+    const size_t matrix_c_size = M * P;
 
     float* matrices = (float*) malloc((matrix_a_size + matrix_b_size + matrix_c_size * 2) * sizeof(float));
     float* matrix_a = &matrices[0];
@@ -148,7 +156,7 @@ int main(int argc, char* argv[]) {
 
     for (uint k = 0; k < STATIC_ARRAY_SIZE(kernels); k++) {
         printf("===\n=== %s\n===\n", kernels[k]);
-        cl_kernel kernel = cl_kernel_from_src(context, device, kernels[k]);
+        cl_kernel kernel = cl_kernel_from_src(context, device, work_items, kernels[k]);
 
         for (uint i = 0; i < matrix_c_size; i++) matrix_c_actual[i] = 0;
         HANDLE_CL_ERR(clEnqueueWriteBuffer(commands, cl_matrix_c, CL_TRUE, 0, sizeof(float) * matrix_c_size, matrix_c_actual, 0, NULL, NULL));
@@ -160,7 +168,6 @@ int main(int argc, char* argv[]) {
         HANDLE_CL_ERR(clSetKernelArg(kernel, 4, sizeof(N), &N));
         HANDLE_CL_ERR(clSetKernelArg(kernel, 5, sizeof(P), &P));
 
-        size_t work_items = 20; /* Must match the TILE_SIZE set in the kernel */
         size_t local_work_size[] = { work_items, work_items };
         size_t global_work_size[] = { M, P };
 

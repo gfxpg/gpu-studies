@@ -9,7 +9,6 @@ __kernel void wideloads(const __global float4* A,
      * (the number of rows, as well as the tile size, must be a multiple of four).
      * A single load can fetch four values using wide data types (float4), which
      * uses the available memory bandwidth more effectively. */
-    #define TILE_SIZE 20
     const size_t tile_num = N / TILE_SIZE;
 
     const size_t tile_row = get_group_id(0);
