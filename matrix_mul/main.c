@@ -3,6 +3,8 @@
 #include <math.h>
 #include "io.h"
 
+#define MAX_PRINT_ERRORS 10
+
 #define DIE(...) ({ fprintf(stderr, __VA_ARGS__); exit(1); })
 #define CHK_CL_ERR(err) ({ if ((err) != CL_SUCCESS) DIE("OpenCL invocation at %s:%i failed with error code %i\n", __FILE__, __LINE__, err); })
 #define HANDLE_CL_ERR(stmt) ({ cl_int err = (stmt); CHK_CL_ERR(err); })
@@ -79,6 +81,8 @@ void print_kernel_profiling_info(cl_event kernel_exec) {
 }
 
 void validate_results(const float* expected_matrix, const float* actual_matrix, uint M, uint P) {
+    uint errors_encountered = 0;
+
     for (size_t m = 0; m < M; m++) {
         for (size_t p = 0; p < P; p++) {
             float expected = expected_matrix[m * M + p];
@@ -86,10 +90,15 @@ void validate_results(const float* expected_matrix, const float* actual_matrix, 
             /* TODO: implement a proper comparison
              * refer to https://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition */
             if (fabsf(expected - actual) > 0.02) {
-                printf("Row %zu, col %zu: expected result is %.8f, actual is %.8f\n", m, p, expected, actual);
+                errors_encountered++;
+                if (errors_encountered < MAX_PRINT_ERRORS)
+                    printf("Row %zu, col %zu: expected result is %.8f, actual is %.8f\n", m, p, expected, actual);
             }
         }
     }
+
+    if (errors_encountered > MAX_PRINT_ERRORS)
+        printf("...\n(%d errors omitted)\n", errors_encountered - MAX_PRINT_ERRORS);
 }
 
 int main(int argc, char* argv[]) {
