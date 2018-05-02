@@ -20,12 +20,11 @@ __kernel void tiled(const __global float* A,
      *                                          ( P / TILE_SIZE cols )
      *
      * The cells are not individual elements, but rather, _square_ tiles the size of
-     * the number of work items in a group. This requires the dimensions of matrices
-     * to be divisible by that number, but that's taken care of on the host.
-     *
-     * In total, we need to go through (N / TILE_SIZE) sets of tiles -- in
-     * the illustration above, tile_num is 2. */
-    const size_t tile_num = N / TILE_SIZE;
+     * the number of work items in a group. This requires matrix dimensions to be
+     * divisible by that number; we take care of that by going through
+     * ceil(N / TILE_SIZE) sets of tiles (2 in the illustration above)
+     * and setting elements with indexes falling outside of matrix dimensions to 0. */
+    const size_t tile_num = (uint) ceil((float) ((float) N / (float) TILE_SIZE));
 
     /* A work group fills in a single tile in the C matrix */
     const size_t tile_row = get_group_id(0);
@@ -43,17 +42,23 @@ __kernel void tiled(const __global float* A,
      * memory reads are synchronized, every work item has access to
      * all values with these tiles. */
     __local float current_a_tile[TILE_SIZE][TILE_SIZE];
-    __local float current_b_tile[TILE_SIZE][TILE_SIZE]; 
-
-    const size_t a_tile_row_stride = TILE_SIZE * N;
-    const size_t b_tile_row_stride = TILE_SIZE * P;
+    __local float current_b_tile[TILE_SIZE][TILE_SIZE];
 
     for (size_t tile = 0; tile < tile_num; tile++) {
-        const size_t a_i = (a_tile_row_stride * tile_row) + (tile * TILE_SIZE) + (row * N) + col;
-        const size_t b_i = (b_tile_row_stride * tile) + (tile_col * TILE_SIZE) + (row * P) + col;
-        current_a_tile[row][col] = A[a_i];
-        current_b_tile[row][col] = B[b_i];
-    
+        const size_t a_i_row = (tile_row * TILE_SIZE) + row;
+        const size_t a_i_col = (tile * TILE_SIZE) + col;
+
+        const size_t b_i_row = (tile * TILE_SIZE) + row;
+        const size_t b_i_col = (tile_col * TILE_SIZE) + col;
+
+        /* If the dimensions are not divisible by the number of work items (TILE_SIZE),
+         * we may encounter elements that are outside the matrix -- treat those as 0s. */
+        if (a_i_row >= M || a_i_col >= N) current_a_tile[row][col] = 0.0f;
+        else current_a_tile[row][col] = A[a_i_row * N + a_i_col];
+
+        if (b_i_row >= N || b_i_col >= P) current_b_tile[row][col] = 0.0f;
+        else current_b_tile[row][col] = B[b_i_row * P + b_i_col];
+
         /* After synchronization, we'll have access to all elements in current A and B tiles */
         barrier(CLK_LOCAL_MEM_FENCE);
 
@@ -64,5 +69,9 @@ __kernel void tiled(const __global float* A,
         barrier(CLK_LOCAL_MEM_FENCE);
     }
 
-    C[(tile_row * a_tile_row_stride) + (tile_col * TILE_SIZE) + (row * P) + col] = c_acc;
+    /* Remember that there might be more work items than there are elements in edge tiles */
+    const size_t result_row = get_global_id(0);
+    const size_t result_col = get_global_id(1);
+    if (result_row < M && result_col < P)
+        C[(tile_row * TILE_SIZE * N) + (tile_col * TILE_SIZE) + (row * P) + col] = c_acc;
 }

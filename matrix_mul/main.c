@@ -136,8 +136,6 @@ int main(int argc, char* argv[]) {
     read_matrix("matrix_b", matrix_b, N * P);
     read_matrix("matrix_c", matrix_c_expected, M * P);
 
-    /* TODO: tiled.cl requires the matrix to be padded to a multiple of work group size */
-
     cl_int err;
 
     cl_device_id device = cl_device(platform);
@@ -171,6 +169,10 @@ int main(int argc, char* argv[]) {
         size_t local_work_size[] = { work_items, work_items };
         size_t global_work_size[] = { M, P };
 
+        if (kernels[k] == "tiled.cl") {
+            global_work_size[0] = ((uint) ceil(global_work_size[0] / (double) work_items)) * work_items;
+            global_work_size[1] = ((uint) ceil(global_work_size[1] / (double) work_items)) * work_items;
+        }
         if (kernels[k] == "wideloads.cl") {
             global_work_size[1] = global_work_size[1] / 4;
             local_work_size[1] = local_work_size[1] / 4;
