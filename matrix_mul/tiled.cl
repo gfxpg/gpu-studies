@@ -72,6 +72,6 @@ __kernel void tiled(const __global float* A,
     /* Remember that there might be more work items than there are elements in edge tiles */
     const size_t result_row = get_global_id(0);
     const size_t result_col = get_global_id(1);
-    if (result_row < M && result_col < P)
-        C[(tile_row * TILE_SIZE * N) + (tile_col * TILE_SIZE) + (row * P) + col] = c_acc;
+    const size_t result_index = (tile_row * TILE_SIZE * P) + (tile_col * TILE_SIZE) + (row * P) + col;
+    if (result_row < M && result_col < P) C[result_index] = c_acc;
 }
