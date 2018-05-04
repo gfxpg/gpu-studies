@@ -10,6 +10,7 @@
 #define CHK_CL_ERR(err) ({ if ((err) != CL_SUCCESS) DIE("OpenCL invocation at %s:%i failed with error code %i\n", __FILE__, __LINE__, err); })
 #define HANDLE_CL_ERR(stmt) ({ cl_int err = (stmt); CHK_CL_ERR(err); })
 #define STATIC_ARRAY_SIZE(ary) (sizeof(ary) / sizeof((ary)[0]))
+#define MIN(a, b) ((a < b) ? a : b)
 
 cl_device_id cl_device(const char* platform_name) {
     cl_uint platform_count;
@@ -63,11 +64,11 @@ cl_kernel cl_kernel_from_src(cl_context context, cl_device_id device, uint work_
     return kernel;
 }
 
-void read_matrix(const char* file_name, float* matrix, size_t matrix_size) {
+void read_matrix(const char* file_name, float* matrix, uint matrix_size) {
     FILE* matrix_file = fopen(file_name, "r");
     if (!matrix_file) DIE("Unable to open %s for reading", file_name);
 
-    for (size_t i = 0; i < matrix_size; i++)
+    for (uint i = 0; i < matrix_size; i++)
         if (fscanf(matrix_file, "%f", &matrix[i]) != 1) DIE("Unable to read a matrix from %s", file_name);
 
     fclose(matrix_file);
@@ -89,8 +90,8 @@ void print_kernel_profiling_info(cl_event kernel_exec) {
 void validate_results(const float* expected_matrix, const float* actual_matrix, uint M, uint P) {
     uint errors_encountered = 0;
 
-    for (size_t m = 0; m < M; m++) {
-        for (size_t p = 0; p < P; p++) {
+    for (uint m = 0; m < M; m++) {
+        for (uint p = 0; p < P; p++) {
             float expected = expected_matrix[m * M + p];
             float actual = actual_matrix[m * M + p];
             /* TODO: implement a proper comparison
@@ -98,13 +99,36 @@ void validate_results(const float* expected_matrix, const float* actual_matrix, 
             if (fabsf(expected - actual) > 0.02) {
                 errors_encountered++;
                 if (errors_encountered < MAX_PRINT_ERRORS)
-                    printf("Row %zu, col %zu: expected result is %.8f, actual is %.8f\n", m, p, expected, actual);
+                    printf("Row %d, col %d: expected result is %.8f, actual is %.8f\n", m, p, expected, actual);
             }
         }
     }
 
     if (errors_encountered > MAX_PRINT_ERRORS)
         printf("...\n(%d errors omitted)\n", errors_encountered - MAX_PRINT_ERRORS);
+}
+
+size_t ceil_divisible_by(size_t num, size_t by) {
+    return ((size_t) ceil(num / (double) by)) * by;
+}
+
+size_t floor_divisible_by(size_t num, size_t by) {
+    return ((size_t) floor(num / (double) by)) * by;
+}
+
+size_t gcd(size_t a, size_t b) {
+    size_t rem;
+    while (b > 0) {
+        rem = a % b;
+        a = b;
+        b = rem;
+    }
+    return a;
+}
+
+size_t optimal_local_size(size_t global_size, size_t max_work_items) {
+    if (global_size < max_work_items) return global_size;
+    return gcd(global_size, max_work_items);
 }
 
 int main(int argc, char* argv[]) {
@@ -118,14 +142,14 @@ int main(int argc, char* argv[]) {
         return 0;
     }
     const char* platform = argv[1];
-    const uint work_items = (uint) strtoul(argv[2], NULL, 10);
+    const uint requested_work_items = (uint) strtoul(argv[2], NULL, 10);
     const uint M = (uint) strtoul(argv[3], NULL, 10);
     const uint N = (uint) strtoul(argv[4], NULL, 10);
     const uint P = (uint) strtoul(argv[5], NULL, 10);
 
-    const size_t matrix_a_size = M * N;
-    const size_t matrix_b_size = N * P;
-    const size_t matrix_c_size = M * P;
+    const uint matrix_a_size = M * N;
+    const uint matrix_b_size = N * P;
+    const uint matrix_c_size = M * P;
 
     float* matrices = (float*) malloc((matrix_a_size + matrix_b_size + matrix_c_size * 2) * sizeof(float));
     float* matrix_a = &matrices[0];
@@ -143,6 +167,18 @@ int main(int argc, char* argv[]) {
     cl_command_queue commands = clCreateCommandQueueWithProperties(context, device, (cl_queue_properties[])
       { CL_QUEUE_PROPERTIES, CL_QUEUE_PROFILING_ENABLE, 0 }, &err); CHK_CL_ERR(err);
 
+    size_t max_work_items;
+    HANDLE_CL_ERR(clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(max_work_items), &max_work_items, NULL));
+
+    const uint wide_work_items = (ceil_divisible_by(requested_work_items, 4) > max_work_items)
+                                 ? floor_divisible_by(requested_work_items, 4)
+                                 : ceil_divisible_by(requested_work_items, 4);
+    const uint M_wide = ceil_divisible_by(M, wide_work_items);
+    const uint N_wide = ceil_divisible_by(N, wide_work_items);
+    const uint P_wide = ceil_divisible_by(P, wide_work_items);
+    const uint matrix_a_wide_size = M * N_wide;
+    const uint matrix_b_wide_size = N * P_wide;
+
     cl_mem cl_matrix_a = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(float) * matrix_a_size, NULL, &err); CHK_CL_ERR(err);
     cl_mem cl_matrix_b = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(float) * matrix_b_size, NULL, &err); CHK_CL_ERR(err);
     cl_mem cl_matrix_c = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(float) * matrix_c_size, NULL, &err); CHK_CL_ERR(err);
@@ -150,17 +186,76 @@ int main(int argc, char* argv[]) {
     HANDLE_CL_ERR(clEnqueueWriteBuffer(commands, cl_matrix_a, CL_TRUE, 0, sizeof(float) * matrix_a_size, matrix_a, 0, NULL, NULL));
     HANDLE_CL_ERR(clEnqueueWriteBuffer(commands, cl_matrix_b, CL_TRUE, 0, sizeof(float) * matrix_b_size, matrix_b, 0, NULL, NULL));
 
+    /* === wideloads.cl prerequisites */
+
+    cl_mem cl_matrix_a_wide;
+    if (matrix_a_wide_size == matrix_a_size) cl_matrix_a_wide = cl_matrix_a;
+    else {
+        printf("===\n=== %s\n===\n", "pad_cols.cl [A]");
+
+        cl_matrix_a_wide = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(float) * matrix_a_wide_size, NULL, &err); CHK_CL_ERR(err);
+
+        cl_event kernel_exec;
+        cl_kernel pad_kernel = cl_kernel_from_src(context, device, wide_work_items, "pad_cols.cl");
+        HANDLE_CL_ERR(clSetKernelArg(pad_kernel, 0, sizeof(cl_matrix_a), &cl_matrix_a));
+        HANDLE_CL_ERR(clSetKernelArg(pad_kernel, 1, sizeof(cl_matrix_a_wide), &cl_matrix_a_wide));
+        HANDLE_CL_ERR(clSetKernelArg(pad_kernel, 2, sizeof(M), &M));
+        HANDLE_CL_ERR(clSetKernelArg(pad_kernel, 3, sizeof(N), &N));
+
+        HANDLE_CL_ERR(clEnqueueNDRangeKernel(commands, pad_kernel, 2, NULL,
+            (size_t[]) { M_wide, N_wide },
+            (size_t[]) { optimal_local_size(M_wide, max_work_items), optimal_local_size(N_wide, max_work_items) },
+            0, NULL, &kernel_exec));
+        HANDLE_CL_ERR(clWaitForEvents(1, &kernel_exec));
+        HANDLE_CL_ERR(clFinish(commands));
+
+        print_kernel_profiling_info(kernel_exec);
+    }
+
+    cl_mem cl_matrix_b_wide;
+    if (matrix_b_wide_size == matrix_b_size) cl_matrix_b_wide = cl_matrix_b;
+    else {
+        printf("===\n=== %s\n===\n", "pad_cols.cl [B]");
+
+        cl_matrix_b_wide = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(float) * matrix_b_wide_size, NULL, &err); CHK_CL_ERR(err);
+
+        cl_event kernel_exec;
+        cl_kernel pad_kernel = cl_kernel_from_src(context, device, wide_work_items, "pad_cols.cl");
+        HANDLE_CL_ERR(clSetKernelArg(pad_kernel, 0, sizeof(cl_matrix_b), &cl_matrix_b));
+        HANDLE_CL_ERR(clSetKernelArg(pad_kernel, 1, sizeof(cl_matrix_b_wide), &cl_matrix_b_wide));
+        HANDLE_CL_ERR(clSetKernelArg(pad_kernel, 2, sizeof(N), &N));
+        HANDLE_CL_ERR(clSetKernelArg(pad_kernel, 3, sizeof(P), &P));
+
+        HANDLE_CL_ERR(clEnqueueNDRangeKernel(commands, pad_kernel, 2, NULL,
+            (size_t[]) { N_wide, P_wide },
+            (size_t[]) { optimal_local_size(N_wide, max_work_items), optimal_local_size(P_wide, max_work_items) },
+            0, NULL, &kernel_exec));
+        HANDLE_CL_ERR(clWaitForEvents(1, &kernel_exec));
+        HANDLE_CL_ERR(clFinish(commands));
+
+        print_kernel_profiling_info(kernel_exec);
+    }
+
     const char* kernels[] = { "simple.cl", "tiled.cl", "wideloads.cl" };
 
     for (uint k = 0; k < STATIC_ARRAY_SIZE(kernels); k++) {
         printf("===\n=== %s\n===\n", kernels[k]);
+
+        uint work_items = (kernels[k] == "wideloads.cl") ? wide_work_items : requested_work_items;
+
         cl_kernel kernel = cl_kernel_from_src(context, device, work_items, kernels[k]);
 
         for (uint i = 0; i < matrix_c_size; i++) matrix_c_actual[i] = 0;
         HANDLE_CL_ERR(clEnqueueWriteBuffer(commands, cl_matrix_c, CL_TRUE, 0, sizeof(float) * matrix_c_size, matrix_c_actual, 0, NULL, NULL));
 
-        HANDLE_CL_ERR(clSetKernelArg(kernel, 0, sizeof(cl_matrix_a), &cl_matrix_a));
-        HANDLE_CL_ERR(clSetKernelArg(kernel, 1, sizeof(cl_matrix_b), &cl_matrix_b));
+        if (kernels[k] == "wideloads.cl") {
+            HANDLE_CL_ERR(clSetKernelArg(kernel, 0, sizeof(cl_matrix_a_wide), &cl_matrix_a_wide));
+            HANDLE_CL_ERR(clSetKernelArg(kernel, 1, sizeof(cl_matrix_b_wide), &cl_matrix_b_wide));
+        }
+        else {
+            HANDLE_CL_ERR(clSetKernelArg(kernel, 0, sizeof(cl_matrix_a), &cl_matrix_a));
+            HANDLE_CL_ERR(clSetKernelArg(kernel, 1, sizeof(cl_matrix_b), &cl_matrix_b));
+        }
         HANDLE_CL_ERR(clSetKernelArg(kernel, 2, sizeof(cl_matrix_c), &cl_matrix_c));
         HANDLE_CL_ERR(clSetKernelArg(kernel, 3, sizeof(M), &M));
         HANDLE_CL_ERR(clSetKernelArg(kernel, 4, sizeof(N), &N));
@@ -169,13 +264,13 @@ int main(int argc, char* argv[]) {
         size_t local_work_size[] = { work_items, work_items };
         size_t global_work_size[] = { M, P };
 
-        if (kernels[k] == "tiled.cl") {
-            global_work_size[0] = ((uint) ceil(global_work_size[0] / (double) work_items)) * work_items;
-            global_work_size[1] = ((uint) ceil(global_work_size[1] / (double) work_items)) * work_items;
+        if (kernels[k] == "tiled.cl" || kernels[k] == "wideloads.cl") {
+            global_work_size[0] = ceil_divisible_by(global_work_size[0], work_items);
+            global_work_size[1] = ceil_divisible_by(global_work_size[1], work_items);
         }
         if (kernels[k] == "wideloads.cl") {
-            global_work_size[1] = global_work_size[1] / 4;
-            local_work_size[1] = local_work_size[1] / 4;
+            global_work_size[1] /= 4;
+            local_work_size[1] /= 4;
         }
 
         printf("Global work size: %zu x %zu, local work size: %zu x %zu\n",
@@ -187,9 +282,6 @@ int main(int argc, char* argv[]) {
         HANDLE_CL_ERR(clWaitForEvents(1, &kernel_exec));
         HANDLE_CL_ERR(clFinish(commands));
         HANDLE_CL_ERR(clEnqueueReadBuffer(commands, cl_matrix_c, CL_TRUE, 0, sizeof(float) * matrix_c_size, matrix_c_actual, 0, NULL, NULL));
-
-        int a = 0; for (int i = 0; i < matrix_c_size; i++) if (matrix_c_actual[i] == 0) a++;
-        size_t calculated = matrix_c_size - a;
 
         validate_results(matrix_c_expected, matrix_c_actual, M, P);
         print_kernel_profiling_info(kernel_exec);
