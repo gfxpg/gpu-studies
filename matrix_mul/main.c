@@ -76,15 +76,12 @@ void read_matrix(const char* file_name, float* matrix, uint matrix_size) {
 
 void print_kernel_profiling_info(cl_event kernel_exec) {
     cl_ulong time_queued;
-    cl_ulong time_start;
     cl_ulong time_end;
 
     HANDLE_CL_ERR(clGetEventProfilingInfo(kernel_exec, CL_PROFILING_COMMAND_QUEUED, sizeof(time_queued), &time_queued, NULL));
-    HANDLE_CL_ERR(clGetEventProfilingInfo(kernel_exec, CL_PROFILING_COMMAND_START, sizeof(time_start), &time_start, NULL));
     HANDLE_CL_ERR(clGetEventProfilingInfo(kernel_exec, CL_PROFILING_COMMAND_END, sizeof(time_end), &time_end, NULL));
 
-    printf("Kernel execution time is %f [ms]\n", ((double) time_end - time_start) / 1000000.0);
-    printf("Time from enqueueing to execution is %f [ms]\n", ((double) time_start - time_queued) / 1000000.0);
+    printf("Total execution time is %f [ms]\n", ((double) time_end - time_queued) / 1000000.0);
 }
 
 void validate_results(const float* expected_matrix, const float* actual_matrix, uint M, uint P) {
@@ -126,11 +123,6 @@ size_t gcd(size_t a, size_t b) {
     return a;
 }
 
-size_t optimal_local_size(size_t global_size, size_t max_work_items) {
-    if (global_size < max_work_items) return global_size;
-    return gcd(global_size, max_work_items);
-}
-
 int main(int argc, char* argv[]) {
     if (argc != 6) {
         printf("Usage: ./matrix_mul platform workitems m n p, where:"
@@ -169,6 +161,7 @@ int main(int argc, char* argv[]) {
 
     size_t max_work_items;
     HANDLE_CL_ERR(clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(max_work_items), &max_work_items, NULL));
+    max_work_items = (size_t) sqrt(max_work_items); /* two dimensions */
 
     const uint wide_work_items = (ceil_divisible_by(requested_work_items, 4) > max_work_items)
                                  ? floor_divisible_by(requested_work_items, 4)
@@ -191,7 +184,7 @@ int main(int argc, char* argv[]) {
     cl_mem cl_matrix_a_wide;
     if (matrix_a_wide_size == matrix_a_size) cl_matrix_a_wide = cl_matrix_a;
     else {
-        printf("===\n=== %s\n===\n", "pad_cols.cl [A]");
+        printf("===\nRunning %s\n", "pad_cols.cl [A]");
 
         cl_matrix_a_wide = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(float) * matrix_a_wide_size, NULL, &err); CHK_CL_ERR(err);
 
@@ -204,7 +197,7 @@ int main(int argc, char* argv[]) {
 
         HANDLE_CL_ERR(clEnqueueNDRangeKernel(commands, pad_kernel, 2, NULL,
             (size_t[]) { M_wide, N_wide },
-            (size_t[]) { optimal_local_size(M_wide, max_work_items), optimal_local_size(N_wide, max_work_items) },
+            (size_t[]) { gcd(M_wide, requested_work_items), gcd(N_wide, requested_work_items) },
             0, NULL, &kernel_exec));
         HANDLE_CL_ERR(clWaitForEvents(1, &kernel_exec));
         HANDLE_CL_ERR(clFinish(commands));
@@ -215,7 +208,7 @@ int main(int argc, char* argv[]) {
     cl_mem cl_matrix_b_wide;
     if (matrix_b_wide_size == matrix_b_size) cl_matrix_b_wide = cl_matrix_b;
     else {
-        printf("===\n=== %s\n===\n", "pad_cols.cl [B]");
+        printf("===\nRunning %s\n", "pad_cols.cl [B]");
 
         cl_matrix_b_wide = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(float) * matrix_b_wide_size, NULL, &err); CHK_CL_ERR(err);
 
@@ -228,7 +221,7 @@ int main(int argc, char* argv[]) {
 
         HANDLE_CL_ERR(clEnqueueNDRangeKernel(commands, pad_kernel, 2, NULL,
             (size_t[]) { N_wide, P_wide },
-            (size_t[]) { optimal_local_size(N_wide, max_work_items), optimal_local_size(P_wide, max_work_items) },
+            (size_t[]) { gcd(N_wide, requested_work_items), gcd(P_wide, requested_work_items) },
             0, NULL, &kernel_exec));
         HANDLE_CL_ERR(clWaitForEvents(1, &kernel_exec));
         HANDLE_CL_ERR(clFinish(commands));
@@ -239,7 +232,7 @@ int main(int argc, char* argv[]) {
     const char* kernels[] = { "simple.cl", "tiled.cl", "wideloads.cl" };
 
     for (uint k = 0; k < STATIC_ARRAY_SIZE(kernels); k++) {
-        printf("===\n=== %s\n===\n", kernels[k]);
+        printf("===\nRunning %s\n", kernels[k]);
 
         uint work_items = (kernels[k] == "wideloads.cl") ? wide_work_items : requested_work_items;
 

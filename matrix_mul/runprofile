@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+
+import re
+import numpy as np
+from subprocess import Popen, PIPE
+
+work_items = [4, 16, 19, 20]
+dimensions = [(20, 30, 40), (123, 456, 789), (1001, 1003, 1009)]
+ocl_driver = 'Intel Gen OCL Driver'
+
+def make_matrices(m, n, p):
+    A = np.random.rand(m, n)
+    B = np.random.rand(n, p)
+    C = A.dot(B)
+    np.savetxt('matrix_a', A.flatten(), fmt='%.8f')
+    np.savetxt('matrix_b', B.flatten(), fmt='%.8f')
+    np.savetxt('matrix_c', C.flatten(), fmt='%.8f')
+
+def kernel_name(stat_str):
+    name = re.search(r"Running (.+)\n", stat_str).group(1)
+    return "wideloads.cl" if name.startswith('pad_cols') else name
+
+def exec_time(stat_str):
+    return float(re.search(r"execution time is ([0-9.]+)", stat_str).group(1))
+
+def has_errors(stat_str):
+    return bool(re.search(r"expected result", stat_str))
+
+def compile_stats(raw_output):
+    raw_lines = list(filter(lambda s: s.startswith('Running'), raw_output.split('===\n')))
+    stats = {}
+    for s in raw_lines:
+        if has_errors(s):
+            stats.pop(kernel_name(s), None)
+        else:
+            stats[kernel_name(s)] = round(stats.get(kernel_name(s), 0) + exec_time(s), 4)
+    return stats
+
+def gather_stats(driver, workitems, m, n, p):
+    proc = Popen(['./matrix_mul', driver, str(workitems), str(m), str(n), str(p)], stdout=PIPE, stderr=PIPE)
+    stdout, _ = proc.communicate()
+    return compile_stats(stdout.decode('utf-8'))
+
+def analyze(items, m, n, p):
+    print(f'Running matrix_mul with {items} workitems')
+    return gather_stats(ocl_driver, items, m, n, p)
+
+output = []
+for (m, n, p) in dimensions:
+    print(f'Generating {m}x{n}x{p} input matrices...')
+    make_matrices(m, n, p)
+    for items in work_items:
+        print(f'Running matrix_mul with {items} workitems')
+        stats = gather_stats(ocl_driver, items, m, n, p)
+        output.append(f'{m},{n},{p},{items},{stats["simple.cl"]},{stats["tiled.cl"]},{stats["wideloads.cl"]}')
+
+with open('profile.csv', 'w') as f:
+    f.write('m,n,p,workitems,simple,tiled,wideloads\n')
+    f.writelines([f'{line}\n' for line in output])
