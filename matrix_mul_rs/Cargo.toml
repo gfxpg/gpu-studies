@@ -1,0 +1,8 @@
+[package]
+name = "matrix_mul_rs"
+version = "0.1.0"
+authors = ["Tim Labushev <tim.labushev@gmail.com>"]
+
+[dependencies]
+ocl = "0.18"
+ocl-core = "0.9"
