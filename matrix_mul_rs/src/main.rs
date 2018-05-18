@@ -13,18 +13,20 @@ const MAX_PRINT_ERRORS: u32 = 10;
 fn main() {
     let args: Vec<String> = env::args().collect();
     println!("{:?}", args);
-    if args.len() != 6 {
-        println!("Usage: ./matrix_mul_rs platform tile_size m n p, where:");
+    if args.len() != 7 {
+        println!("Usage: ./matrix_mul_rs platform tile_size m n p device_gflops, where:");
         println!("    platform is the OpenCL platform used, e.g. \"Intel Gen OCL Driver\"");
         println!("    tile_size is the size of the tiles input matrices are split into during computation (matches the number of work items)");
         println!("    m-by-n specifies the dimensions of matrix A");
         println!("    n-by-p specifies the dimensions of matrix B");
+        println!("    device_gflops is the max GFLOPS of the device, used for profiling");
         return;
     }
 
     let platform_name: String = args[1].to_owned();
     let (tile_size, m, n, p): (u32, u32, u32, u32) =
         (unwrap!(args[2].parse()), unwrap!(args[3].parse()), unwrap!(args[4].parse()), unwrap!(args[5].parse()));
+    let device_max_gflops = unwrap!(args[6].parse::<f64>());
 
     let (device, context, queue) = unwrap!(init_ocl(platform_name));
     let (buffer_a, buffer_b, buffer_c, matrix_c_expected) = unwrap!(load_matrices(&queue, m, n, p));
@@ -92,7 +94,11 @@ fn main() {
         unwrap!(buffer_c.cmd().queue(&queue).offset(0).read(&mut matrix_c_actual).enq());
 
         verify_results(&matrix_c_expected, &matrix_c_actual, p);
-        println!("Execution time is {} [ms]", unwrap!(get_execution_time_ns(&exec_event)) as f64 / 1000000.0);
+        let (kernel_exec_time_ns, total_time_ns) = unwrap!(get_execution_time_ns(&exec_event));
+        println!("Execution time is {} [ms]", total_time_ns as f64 / 1_000_000.0);
+        let total_flops_theory = ((2 * n - 1) * m * p) as u64;
+        let exec_gflops = (total_flops_theory as f64 / kernel_exec_time_ns as f64) / /* nano */ 1_000_000_000.0 * /* giga */ 1_000_000_000.0;
+        println!("GFLOPS: {:.3}, efficiency: {:.1}%", exec_gflops, exec_gflops / device_max_gflops * 100.0);
     }
 }
 
@@ -122,8 +128,9 @@ fn run_pad_cols_kernel(dev: &Device, ctx: &Context, queue: &Queue, buffer_a: &Bu
             .enq()?;
     }
 
-    exec_event.wait_for();
-    println!("Execution time is {} [ms]", get_execution_time_ns(&exec_event)? as f64 / 1000000.0);
+    exec_event.wait_for()?;
+    let (_, total_exec_time) = get_execution_time_ns(&exec_event)?;
+    println!("Execution time is {} [ms]",total_exec_time as f64 / 1000000.0);
 
     Ok(buffer_a_wide)
 }
@@ -142,12 +149,12 @@ fn gcd(a: u32, b: u32) -> u32 {
     a
 }
 
-fn get_execution_time_ns(event: &Event) -> GenResult<u64> {
-    use ocl::enums::{ProfilingInfo, ProfilingInfoResult::{Queued, End}};
+fn get_execution_time_ns(event: &Event) -> GenResult<(u64, u64)> {
+    use ocl::enums::{ProfilingInfo, ProfilingInfoResult::{Queued, Start, End}};
 
-    if let (Queued(time_queued), End(time_end)) =
-        (event.profiling_info(ProfilingInfo::Queued)?, event.profiling_info(ProfilingInfo::End)?) {
-        Ok(time_end - time_queued)
+    if let (Queued(time_queued), Start(time_start), End(time_end)) =
+        (event.profiling_info(ProfilingInfo::Queued)?, event.profiling_info(ProfilingInfo::Start)?, event.profiling_info(ProfilingInfo::End)?) {
+        Ok((time_end - time_start, time_end - time_queued))
     }
     else {
         gen_error_format!("Unable to obtain kernel profiling info")
