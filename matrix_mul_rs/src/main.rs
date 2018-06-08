@@ -32,6 +32,9 @@ fn main() {
     let (buffer_a, buffer_b, buffer_c, matrix_c_expected) = unwrap!(load_matrices(&queue, m, n, p));
     let max_work_group_size = unwrap!(device.max_wg_size()) as u32;
 
+    /* Used to reset the result buffer between kernel runs to ensure correct results */
+    let matrix_c_empty = vec![0.0f32; (m * p) as usize];
+
     /* wideloads.cl setup */
     let n_wide = ceil_divisible_by(n, tile_size);
     let p_wide = ceil_divisible_by(p, tile_size);
@@ -48,17 +51,26 @@ fn main() {
     }
     else { &buffer_b };
 
-    for &src_filename in ["tiled.cl", "wideloads.cl"].iter() {
+
+    for &src_filename in ["tiled.cl", "wideloads.cl", "subgroups.cl"].iter() {
         let (kernel_name, _ext) = src_filename.split_at(src_filename.len() - 3);
         if kernel_name == "wideloads" && tile_size % 4 != 0 {
             println!("===\ntile_size is not divisible by 4; skipping wideloads");
             continue;
         }
+        if kernel_name == "subgroups" && tile_size != 32 {
+            println!("===\ntile_size is not 32; skipping subgroups");
+            continue;
+        }
         println!("===\nRunning {}", kernel_name);
 
-        let mut global_size = [ceil_divisible_by(m, tile_size), ceil_divisible_by(n, tile_size)];
+        let mut global_size = [ceil_divisible_by(m, tile_size), ceil_divisible_by(p, tile_size)];
         let mut local_size = [tile_size, tile_size];
         if kernel_name == "wideloads" { global_size[1] /= 4; local_size[1] /= 4; }
+        if kernel_name == "subgroups" {
+            global_size[0] /= 8; global_size[1] /= 4;
+            local_size[0] = 8; local_size[1] = 8;
+        }
 
         if local_size[0] * local_size[1] > max_work_group_size {
             println!("Local work size exceeds device limits; skipping this kernel.");
@@ -72,12 +84,16 @@ fn main() {
         let kernel = unwrap!(Kernel::builder()
             .queue(queue.clone())
             .program(&program).name(kernel_name)
-            .arg(if kernel_name == "wideloads" { ref_wide_buffer_a } else { &buffer_a })
-            .arg(if kernel_name == "wideloads" { ref_wide_buffer_b } else { &buffer_b })
+            .arg(if kernel_name == "wideloads" || kernel_name == "subgroups" { ref_wide_buffer_a } else { &buffer_a })
+            .arg(if kernel_name == "wideloads" || kernel_name == "subgroups" { ref_wide_buffer_b } else { &buffer_b })
             .arg(&buffer_c).arg(m).arg(n).arg(p)
             .build());
 
         let mut exec_event = Event::empty();
+
+        /* Important! We need to reset the result buffer between running the next kernel to avoid
+         * cases where the kernel doesn't compute some tiles and still reports a correct result */
+        unwrap!(buffer_c.cmd().queue(&queue).offset(0).write(&matrix_c_empty).enq());
 
         unsafe {
             unwrap!(kernel.cmd()
@@ -94,18 +110,18 @@ fn main() {
         unwrap!(buffer_c.cmd().queue(&queue).offset(0).read(&mut matrix_c_actual).enq());
 
         verify_results(&matrix_c_expected, &matrix_c_actual, p);
-        let (kernel_exec_time_ns, total_time_ns) = unwrap!(get_execution_time_ns(&exec_event));
+        let total_time_ns = unwrap!(get_execution_time_ns(&exec_event));
         println!("Execution time is {} [ms]", total_time_ns as f64 / 1_000_000.0);
-        let total_flops_theory = ((2 * n - 1) * m * p) as u64;
-        let exec_gflops = (total_flops_theory as f64 / kernel_exec_time_ns as f64) / /* nano */ 1_000_000_000.0 * /* giga */ 1_000_000_000.0;
-        println!("GFLOPS: {:.3}, efficiency: {:.1}%", exec_gflops, exec_gflops / device_max_gflops * 100.0);
+        let total_flops_theory = (2 * (n as u64) - 1) * (m as u64) * (p as u64);
+        let exec_gflops = (total_flops_theory as f64 / total_time_ns as f64) / /* nano */ 1_000_000_000.0 * /* giga */ 1_000_000_000.0;
+        println!("Measured perf: {:.3} [GFLOPS], efficiency: {:.1}%", exec_gflops, exec_gflops / device_max_gflops * 100.0);
     }
 }
 
 fn run_pad_cols_kernel(dev: &Device, ctx: &Context, queue: &Queue, buffer_a: &Buffer<f32>, m: u32, n: u32, tile_size: u32) -> GenResult<Buffer<f32>> {
     println!("===\nRunning pad_cols.cl");
     let (m_wide, n_wide) = (ceil_divisible_by(m, tile_size), ceil_divisible_by(n, tile_size));
-    let buffer_a_wide = Buffer::<f32>::builder().queue(queue.clone()).flags(flags::MEM_READ_WRITE).len(m * n_wide).build()?;
+    let buffer_a_wide = Buffer::<f32>::builder().queue(queue.clone()).flags(flags::MemFlags::new().alloc_host_ptr().read_write()).len(m * n_wide).build()?;
     let program = build_ocl_program(dev, ctx, format!("#define TILE_SIZE {}", tile_size), "pad_cols.cl")?;
 
     let max_local_size = (dev.max_wg_size()? as f32).sqrt() as u32;
@@ -129,7 +145,7 @@ fn run_pad_cols_kernel(dev: &Device, ctx: &Context, queue: &Queue, buffer_a: &Bu
     }
 
     exec_event.wait_for()?;
-    let (_, total_exec_time) = get_execution_time_ns(&exec_event)?;
+    let total_exec_time = get_execution_time_ns(&exec_event)?;
     println!("Execution time is {} [ms]",total_exec_time as f64 / 1000000.0);
 
     Ok(buffer_a_wide)
@@ -149,12 +165,12 @@ fn gcd(a: u32, b: u32) -> u32 {
     a
 }
 
-fn get_execution_time_ns(event: &Event) -> GenResult<(u64, u64)> {
-    use ocl::enums::{ProfilingInfo, ProfilingInfoResult::{Queued, Start, End}};
+fn get_execution_time_ns(event: &Event) -> GenResult<u64> {
+    use ocl::enums::{ProfilingInfo, ProfilingInfoResult::{Queued, End}};
 
-    if let (Queued(time_queued), Start(time_start), End(time_end)) =
-        (event.profiling_info(ProfilingInfo::Queued)?, event.profiling_info(ProfilingInfo::Start)?, event.profiling_info(ProfilingInfo::End)?) {
-        Ok((time_end - time_start, time_end - time_queued))
+    if let (Queued(time_queued), End(time_end)) =
+        (event.profiling_info(ProfilingInfo::Queued)?, event.profiling_info(ProfilingInfo::End)?) {
+        Ok(time_end - time_queued)
     }
     else {
         gen_error_format!("Unable to obtain kernel profiling info")
@@ -188,9 +204,9 @@ fn load_matrices(queue: &Queue, m: u32, n: u32, p: u32) -> GenResult<(Buffer<f32
     let matrix_b = read_matrix("matrix_b", n * p)?;
     let matrix_c = read_matrix("matrix_c", m * p)?;
 
-    let buffer_a = Buffer::<f32>::builder().queue(queue.clone()).flags(flags::MEM_READ_ONLY).len(m * n).build()?;
-    let buffer_b = Buffer::<f32>::builder().queue(queue.clone()).flags(flags::MEM_READ_ONLY).len(n * p).build()?;
-    let buffer_c = Buffer::<f32>::builder().queue(queue.clone()).flags(flags::MEM_WRITE_ONLY).len(m * p).build()?;
+    let buffer_a = Buffer::<f32>::builder().queue(queue.clone()).flags(flags::MemFlags::new().alloc_host_ptr().read_only()).len(m * n).build()?;
+    let buffer_b = Buffer::<f32>::builder().queue(queue.clone()).flags(flags::MemFlags::new().alloc_host_ptr().read_only()).len(n * p).build()?;
+    let buffer_c = Buffer::<f32>::builder().queue(queue.clone()).flags(flags::MemFlags::new().alloc_host_ptr().write_only()).len(m * p).build()?;
 
     buffer_a.cmd().queue(&queue).offset(0).write(&matrix_a).enq()?;
     buffer_b.cmd().queue(&queue).offset(0).write(&matrix_b).enq()?;
