@@ -1,5 +1,5 @@
 import { glCreateProgram, glLoadAttrib } from '../shared/gl.0.js';
-import { rad, matrotx3d, matroty3d } from '../shared/transform.0.js';
+import { rad, matrotx3d, matroty3d, matscale3d } from '../shared/transform.0.js';
 import MouseControls from '../shared/mousecontrols.0.js';
 
 const vertices = new Float32Array([
@@ -47,6 +47,12 @@ const colors = new Uint8Array([
   0, 0, 0
 ]);
 
+let Globals = {
+  rotX: 0,
+  rotY: 0,
+  scale: 1
+};
+
 async function main() {
   const canvas = document.querySelector('canvas');
   const gl = canvas.getContext('webgl2'); 
@@ -72,19 +78,32 @@ async function main() {
 
   gl.useProgram(program);
 
-  redraw(gl, program, 0, 0);
+  redraw(gl, program);
 
   new MouseControls(canvas, (rotX, rotY) => {
-    redraw(gl, program, rotX, rotY);
+    Globals.rotX = rotX;
+    Globals.rotY = rotY;
+    redraw(gl, program);
+  });
+
+  document.querySelector('#scale').addEventListener('input', ({ target: { value } }) => {
+    Globals.scale = parseFloat(value);
+    redraw(gl, program);
   });
 }
 
-function redraw(gl, program, rotX, rotY) {
+function redraw(gl, program) {
   const xRotationUniform = gl.getUniformLocation(program, 'u_x_rotation');
-  gl.uniformMatrix4fv(xRotationUniform, false /* must be false */, matrotx3d(rotX));
+  gl.uniformMatrix4fv(xRotationUniform, false /* must be false */,
+    matrotx3d(Globals.rotX));
 
   const yRotationUniform = gl.getUniformLocation(program, 'u_y_rotation');
-  gl.uniformMatrix4fv(yRotationUniform, false /* must be false */, matroty3d(rotY));
+  gl.uniformMatrix4fv(yRotationUniform, false /* must be false */,
+    matroty3d(Globals.rotY));
+  
+  const scaleUniform = gl.getUniformLocation(program, 'u_scale');
+  gl.uniformMatrix4fv(scaleUniform, false /* must be false */,
+    matscale3d(Globals.scale, Globals.scale, Globals.scale));
 
   gl.drawArrays(gl.TRIANGLES, 0 /* offset */, vertices.length / 3);
 }
