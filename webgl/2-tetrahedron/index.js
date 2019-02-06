@@ -1,5 +1,5 @@
-import { glCreateProgram, glLoadAttrib } from './gl.js';
-import { matXRot, matYRot, matZRot } from './transforms.js';
+import { glCreateProgram, glLoadAttrib } from '../shared/gl.0.js';
+import { rad, matrotx3d, matroty3d, matrotz3d } from '../shared/transform.0.js';
 
 const vertices = new Float32Array([
   // x, y, z, from -1 to 1, 0 is the center
@@ -76,18 +76,18 @@ async function main() {
 }
 
 function redraw(gl, program, degAngle) {
-  const xAngle = parseFloat(document.querySelector('#angle-x').value),
-        yAngle = parseFloat(document.querySelector('#angle-y').value),
-        zAngle = parseFloat(document.querySelector('#angle-z').value);
+  const xRad = rad(parseFloat(document.querySelector('#angle-x').value)),
+        yRad = rad(parseFloat(document.querySelector('#angle-y').value)),
+        zRad = rad(parseFloat(document.querySelector('#angle-z').value));
   
   const xRotationUniform = gl.getUniformLocation(program, 'u_x_rotation');
-  gl.uniformMatrix4fv(xRotationUniform, false /* must be false */, matXRot(xAngle));
+  gl.uniformMatrix4fv(xRotationUniform, false /* must be false */, matrotx3d(xRad));
 
   const yRotationUniform = gl.getUniformLocation(program, 'u_y_rotation');
-  gl.uniformMatrix4fv(yRotationUniform, false /* must be false */, matYRot(yAngle));
+  gl.uniformMatrix4fv(yRotationUniform, false /* must be false */, matroty3d(yRad));
 
   const zRotationUniform = gl.getUniformLocation(program, 'u_z_rotation');
-  gl.uniformMatrix4fv(zRotationUniform, false /* must be false */, matZRot(zAngle));
+  gl.uniformMatrix4fv(zRotationUniform, false /* must be false */, matrotz3d(zRad));
 
   gl.drawArrays(gl.TRIANGLES, 0 /* offset */, vertices.length / 3);
 }
