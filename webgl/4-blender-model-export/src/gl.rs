@@ -39,23 +39,21 @@ pub fn compile_shader(ctx: &WebGl2RenderingContext, shader_type: u32, source: &s
     }
 }
 
-pub fn link_program<'a, T: IntoIterator<Item = &'a WebGlShader>>(ctx: &WebGl2RenderingContext, shaders: T) -> Result<WebGlProgram, String> {
-    let program = ctx.create_program().ok_or("Failed to create WebGlProgram")?;
-
+pub fn link_program<'a, T: IntoIterator<Item = &'a WebGlShader>>(ctx: &WebGl2RenderingContext, program: &WebGlProgram, shaders: T) -> Result<(), String> {
     for shader in shaders {
-        ctx.attach_shader(&program, shader)
+        ctx.attach_shader(program, shader)
     }
 
-    ctx.link_program(&program);
+    ctx.link_program(program);
 
-    let success = ctx.get_program_parameter(&program, WebGl2RenderingContext::LINK_STATUS)
+    let success = ctx.get_program_parameter(program, WebGl2RenderingContext::LINK_STATUS)
         .as_bool().unwrap_or(false);
 
     if success {
-        Ok(program)
+        Ok(())
     }
     else {
-        Err(ctx.get_program_info_log(&program)
+        Err(ctx.get_program_info_log(program)
             .unwrap_or("Unknown error creating WebGlProgram".to_owned()))
     }
 }
