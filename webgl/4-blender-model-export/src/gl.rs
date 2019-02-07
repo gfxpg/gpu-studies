@@ -1,7 +1,13 @@
 use web_sys::{WebGl2RenderingContext, WebGlProgram, WebGlShader};
 
-pub fn load_attrib(ctx: &WebGl2RenderingContext, data: &js_sys::Object, size: i32, data_type: u32, normalized: bool) -> Result<(), String> {
+pub fn load_attrib(ctx: &WebGl2RenderingContext, program: &WebGlProgram, attrib: &str,
+                   data: &js_sys::Object, size: i32, data_type: u32, normalized: bool) -> Result<(), String> {
     let buffer = ctx.create_buffer().ok_or("Failed to create WebGlBuffer")?;
+
+    let a_location = match WebGl2RenderingContext::get_attrib_location(ctx, program, attrib) {
+        -1 => Err(format!("Unable to find the \"{}\" attribute in the current program", attrib)),
+        valid_location => Ok(valid_location as u32)
+    }?;
 
     ctx.bind_buffer(WebGl2RenderingContext::ARRAY_BUFFER, Some(&buffer));
     ctx.buffer_data_with_array_buffer_view(
@@ -9,8 +15,8 @@ pub fn load_attrib(ctx: &WebGl2RenderingContext, data: &js_sys::Object, size: i3
         &data,
         WebGl2RenderingContext::STATIC_DRAW
     );
-    ctx.vertex_attrib_pointer_with_i32(0, size, data_type, normalized, 0, 0);
-    ctx.enable_vertex_attrib_array(0);
+    ctx.enable_vertex_attrib_array(a_location);
+    ctx.vertex_attrib_pointer_with_i32(a_location, size, data_type, normalized, 0, 0);
 
     Ok(())
 }

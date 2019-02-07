@@ -15,14 +15,11 @@ js-sys = "0.3.10"
 [dependencies.web-sys]
 version = "0.3.10"
 features = [
-  "Document",
-  "Element",
   "HtmlCanvasElement",
   "WebGl2RenderingContext",
   "WebGlBuffer",
   "WebGlProgram",
-  "WebGlShader",
-  "Window",
+  "WebGlShader"
 ]
 
 [profile.release]

@@ -1,4 +1,5 @@
 mod gl;
+mod interop;
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
@@ -27,14 +28,15 @@ pub fn load_gl(canvas_js: JsValue) -> Result<(), JsValue> {
     let vertices: [f32; 9] = [-0.7, -0.7, 0.0,
                               0.7, -0.7, 0.0,
                               0.0, 0.7, 0.0];
-    let vertices_location = vertices.as_ptr() as u32 / 4;
-    let memory_buffer = wasm_bindgen::memory()
-        .dyn_into::<js_sys::WebAssembly::Memory>()?
-        .buffer();
-    let vert_array = js_sys::Float32Array::new(&memory_buffer)
-        .subarray(vertices_location, vertices_location + vertices.len() as u32);
+    let vertices_array = interop::get_float32array(&vertices)?;
 
-    gl::load_attrib(&ctx, &vert_array, 3, WebGl2RenderingContext::FLOAT, false)?;
+    let colors: [u8; 9] = [236, 188, 124,
+                           124, 236, 132,
+                           188, 124, 236];
+    let colors_array = interop::get_uint8array(&colors)?;
+
+    gl::load_attrib(&ctx, &program, "a_position", &vertices_array, 3, WebGl2RenderingContext::FLOAT, false)?;
+    gl::load_attrib(&ctx, &program, "a_color", &colors_array, 3, WebGl2RenderingContext::UNSIGNED_BYTE, true)?;
 
     ctx.clear_color(0.0, 0.0, 0.0, 0.0);
     ctx.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
