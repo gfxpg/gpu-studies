@@ -17,6 +17,7 @@ pub struct Renderer {
     ctx: WebGl2RenderingContext,
     program: WebGlProgram,
     model: (Vec<f32>, Vec<u8>),
+    perspective_mat: [f32; 16],
 
     rot_x_rad: f32,
     rot_y_rad: f32,
@@ -37,7 +38,17 @@ impl Renderer {
         let model = model::load(MODEL_PLY)
             .map_err(|e| format!("{}", e))?;
 
-        Ok(Renderer { ctx, program, model, rot_x_rad: 0.0, rot_y_rad: 0.0, scale: 1.0 })
+        let perspective_mat = transform::matmul4(
+            transform::mat4_translation(0.0, 0.0, -2.5),
+            transform::mat4_perspective(
+                60_f32.to_radians(), canvas.width() as f32 / canvas.height() as f32,
+                1.0, 12.0)
+        );
+
+        Ok(Renderer {
+            ctx, program, model, perspective_mat,
+            rot_x_rad: 0.0, rot_y_rad: 0.0, scale: 1.0
+        })
     }
 
     pub fn set_rotation(&mut self, x_rad: f32, y_rad: f32) {
@@ -72,16 +83,20 @@ impl Renderer {
     }
 
     pub fn render(&self) -> Result<(), JsValue> {
-        let mut world_mat = transform::matmul4(
-            transform::mat4_scale(self.scale),
+        let mut world_mat =
             transform::matmul4(
-                transform::mat4_rot_x(self.rot_x_rad),
-                transform::mat4_rot_y(self.rot_y_rad)
-            )
-        );
+                transform::mat4_scale(self.scale),
+                transform::matmul4(
+                    transform::mat4_rot_y(self.rot_y_rad),
+                    transform::matmul4(
+                        transform::mat4_rot_x(self.rot_x_rad),
+                        self.perspective_mat
+                    )
+                )
+            );
 
         self.ctx.clear_color(0.0, 0.0, 0.0, 0.0);
-        self.ctx.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT);
+        self.ctx.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT | WebGl2RenderingContext::DEPTH_BUFFER_BIT);
 
         let _ = gl::load_uniform_mat4(&self.ctx, &self.program, "u_world_transform", &mut world_mat);
 
