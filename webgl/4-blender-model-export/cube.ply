@@ -1,0 +1,34 @@
+ply
+format ascii 1.0
+comment Created by Blender 2.80 (sub 43) - www.blender.org, source file: ''
+element vertex 8
+property float x
+property float y
+property float z
+property uchar red
+property uchar green
+property uchar blue
+property uchar alpha
+element face 12
+property list uchar uint vertex_indices
+end_header
+0.500000 0.500000 0.500000 190 82 255 255
+-0.500000 0.500000 0.500000 93 255 155 255
+-0.500000 -0.500000 0.500000 102 186 255 255
+0.500000 -0.500000 0.500000 95 253 158 255
+0.500000 -0.500000 -0.500000 255 98 102 255
+-0.500000 -0.500000 -0.500000 102 186 255 255
+-0.500000 0.500000 -0.500000 244 99 126 255
+0.500000 0.500000 -0.500000 190 82 255 255
+3 0 1 2
+3 0 2 3
+3 4 3 2
+3 4 2 5
+3 5 2 1
+3 5 1 6
+3 6 7 4
+3 6 4 5
+3 7 0 3
+3 7 3 4
+3 6 1 0
+3 6 0 7
