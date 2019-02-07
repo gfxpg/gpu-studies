@@ -1,10 +1,19 @@
 use web_sys::{WebGl2RenderingContext, WebGlProgram, WebGlShader};
 
+pub fn load_uniform_mat4(ctx: &WebGl2RenderingContext, program: &WebGlProgram, uniform: &str, mat: &mut [f32; 16]) -> Result<(), String> {
+    let u_location = ctx.get_uniform_location(program, uniform)
+        .ok_or(format!("Unable to find the \"{}\" uniform in the current program", uniform))?;
+
+    ctx.uniform_matrix4fv_with_f32_array(Some(&u_location), false, mat);
+
+    Ok(())
+}
+
 pub fn load_attrib(ctx: &WebGl2RenderingContext, program: &WebGlProgram, attrib: &str,
                    data: &js_sys::Object, size: i32, data_type: u32, normalized: bool) -> Result<(), String> {
     let buffer = ctx.create_buffer().ok_or("Failed to create WebGlBuffer")?;
 
-    let a_location = match WebGl2RenderingContext::get_attrib_location(ctx, program, attrib) {
+    let a_location = match ctx.get_attrib_location(program, attrib) {
         -1 => Err(format!("Unable to find the \"{}\" attribute in the current program", attrib)),
         valid_location => Ok(valid_location as u32)
     }?;

@@ -18,6 +18,7 @@ features = [
   "console",
   "HtmlCanvasElement",
   "WebGl2RenderingContext",
+  "WebGlUniformLocation",
   "WebGlBuffer",
   "WebGlProgram",
   "WebGlShader"
