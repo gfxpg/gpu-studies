@@ -1,35 +1,62 @@
-use ply_rs as ply;
+use ply_rs::ply;
+use ply_rs::parser;
+
+#[derive(Debug)]
+struct Vertex { x: f32, y: f32, z: f32, r: u8, g: u8, b: u8 }
+
+#[derive(Debug)]
+struct Face { vertex_indices: Vec<u32> }
+
+impl ply::PropertyAccess for Vertex {
+    fn new() -> Self {
+        Vertex { x: 0.0, y: 0.0, z: 0.0, r: 0, g: 0, b: 0 }
+    }
+
+    fn set_property(&mut self, key: String, property: ply::Property) {
+        match (key.as_ref(), property) {
+            ("x", ply::Property::Float(v)) => self.x = v,
+            ("y", ply::Property::Float(v)) => self.y = v,
+            ("z", ply::Property::Float(v)) => self.z = v,
+            ("red", ply::Property::UChar(v)) => self.r = v,
+            ("green", ply::Property::UChar(v)) => self.g = v,
+            ("blue", ply::Property::UChar(v)) => self.b = v,
+            _ => ()
+        }
+    }
+}
+
+impl ply::PropertyAccess for Face {
+    fn new() -> Self {
+        Face { vertex_indices: Vec::new() }
+    }
+
+    fn set_property(&mut self, key: String, property: ply::Property) {
+        if let ("vertex_indices", ply::Property::ListUInt(vec)) = (key.as_ref(), property) {
+            self.vertex_indices = vec;
+        }
+    }
+}
 
 pub fn load(ascii_source: &str) -> std::io::Result<(Vec<f32>, Vec<u8>)> {
-    use ply_rs::ply::PropertyAccess;
-
-    let parser = ply::parser::Parser::<ply::ply::DefaultElement>::new();
     let mut model_source = std::io::Cursor::new(ascii_source);
-    let model = parser.read_ply(&mut model_source)?.payload;
+    let vertex_parser = parser::Parser::<Vertex>::new();
+    let face_parser = parser::Parser::<Face>::new();
 
-    let x_key = "x".to_owned();
-    let y_key = "y".to_owned();
-    let z_key = "z".to_owned();
+    let header = vertex_parser.read_header(&mut model_source)?;
+    let vertices = vertex_parser.read_payload_for_element(&mut model_source, &header.elements["vertex"], &header)?;
+    let faces = face_parser.read_payload_for_element(&mut model_source, &header.elements["face"], &header)?;
 
-    let r_key = "red".to_owned();
-    let g_key = "green".to_owned();
-    let b_key = "blue".to_owned();
-
-    let vertices: Vec<f32> = model["vertex"].iter().flat_map(|m| {
-        vec![
-            m.get_float(&x_key).unwrap(),
-            m.get_float(&y_key).unwrap(),
-            m.get_float(&z_key).unwrap()
-        ]
+    let vertex_array: Vec<f32> = faces.iter().flat_map(|f| {
+        f.vertex_indices.iter().flat_map(|&i| vec![
+            vertices[i as usize].x, vertices[i as usize].y, vertices[i as usize].z
+        ])
     }).collect();
 
-    let colors: Vec<u8> = model["vertex"].iter().flat_map(|m| {
-        vec![
-            m.get_uchar(&r_key).unwrap(),
-            m.get_uchar(&g_key).unwrap(),
-            m.get_uchar(&b_key).unwrap()
-        ]
+    let color_array: Vec<u8> = faces.iter().flat_map(|f| {
+        f.vertex_indices.iter().flat_map(|&i| vec![
+            vertices[i as usize].r, vertices[i as usize].g, vertices[i as usize].b
+        ])
     }).collect();
 
-    Ok((vertices, colors))
+    Ok((vertex_array, color_array))
 }
