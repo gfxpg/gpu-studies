@@ -1,9 +1,20 @@
 # Blender Model Export 
 
+## Development
+
 Building the WebAssembly package:
 
 ```
-wasm-pack build --target no-modules
+wasm-pack build --dev --target no-modules
+```
+
+Requires [Rust nightly](https://github.com/rust-lang/rustup.rs/blob/master/README.md#working-with-nightly-rust)
+and [wasm-pack](https://rustwasm.github.io/wasm-pack/).
+
+## Release build
+
+```
+wasm-pack build --release --target no-modules
 ```
 
 Optionally:
