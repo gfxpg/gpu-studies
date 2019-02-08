@@ -1,0 +1,31 @@
+[package]
+name = "textures"
+version = "0.1.0"
+authors = ["timlathy <tim.labushev@gmail.com>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2.33"
+js-sys = "0.3.10"
+ply-rs = "0.1.1"
+
+[dependencies.web-sys]
+version = "0.3.10"
+features = [
+  "console",
+  "HtmlCanvasElement",
+  "WebGl2RenderingContext",
+  "WebGlUniformLocation",
+  "WebGlBuffer",
+  "WebGlTexture",
+  "WebGlProgram",
+  "WebGlShader",
+  "ImageBitmap"
+]
+
+[profile.release]
+opt-level = 2
+lto = true
