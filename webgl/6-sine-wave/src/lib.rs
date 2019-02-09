@@ -71,8 +71,8 @@ impl Renderer {
         gl::load_attrib(&self.ctx, &self.program, "a_position", &vertices_array, 3, WebGl2RenderingContext::FLOAT, false)?;
 
         /* Don't draw back-facing triangles */
-        self.ctx.enable(WebGl2RenderingContext::CULL_FACE);
-        self.ctx.enable(WebGl2RenderingContext::DEPTH_TEST);
+        //self.ctx.enable(WebGl2RenderingContext::CULL_FACE);
+        //self.ctx.enable(WebGl2RenderingContext::DEPTH_TEST);
 
         self.ctx.use_program(Some(&self.program));
 
