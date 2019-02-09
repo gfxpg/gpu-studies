@@ -21,7 +21,10 @@ pub struct Renderer {
 
     rot_x_rad: f32,
     rot_y_rad: f32,
-    scale: f32
+    scale: f32,
+    amplitude: f32,
+    phase: f32,
+    freq: f32
 }
 
 #[wasm_bindgen]
@@ -47,17 +50,9 @@ impl Renderer {
 
         Ok(Renderer {
             ctx, program, model, perspective_mat,
-            rot_x_rad: 0.0, rot_y_rad: 0.0, scale: 1.0
+            rot_x_rad: 0.0, rot_y_rad: 0.0, scale: 0.8,
+            amplitude: 1.0, phase: 0.0, freq: 4.0
         })
-    }
-
-    pub fn set_rotation(&mut self, x_rad: f32, y_rad: f32) {
-        self.rot_x_rad = x_rad;
-        self.rot_y_rad = y_rad;
-    }
-
-    pub fn set_scale(&mut self, scale: f32) {
-        self.scale = scale;
     }
 
     pub fn instantiate(&self) -> Result<(), JsValue> {
@@ -95,10 +90,39 @@ impl Renderer {
         self.ctx.clear_color(0.0, 0.0, 0.0, 0.0);
         self.ctx.clear(WebGl2RenderingContext::COLOR_BUFFER_BIT | WebGl2RenderingContext::DEPTH_BUFFER_BIT);
 
-        let _ = gl::load_uniform_mat4(&self.ctx, &self.program, "u_world_transform", &mut world_mat);
+        gl::load_uniform_mat4(&self.ctx, &self.program, "u_world_transform", &mut world_mat)?;
+        gl::load_uniform_f32(&self.ctx, &self.program, "u_amplitude", self.amplitude)?;
+        gl::load_uniform_f32(&self.ctx, &self.program, "u_phase", self.phase)?;
+        gl::load_uniform_f32(&self.ctx, &self.program, "u_freq", self.freq)?;
 
         self.ctx.draw_arrays(WebGl2RenderingContext::TRIANGLES, 0, (self.model.vertices.len() / 3) as i32);
 
         Ok(())
+    }
+
+    pub fn update_rotation(&mut self, x_rad: f32, y_rad: f32) -> Result<(), JsValue> {
+        self.rot_x_rad = x_rad;
+        self.rot_y_rad = y_rad;
+        self.render()
+    }
+
+    pub fn update_scale(&mut self, scale: f32) -> Result<(), JsValue> {
+        self.scale = scale;
+        self.render()
+    }
+
+    pub fn update_amplitude(&mut self, amplitude: f32) -> Result<(), JsValue> {
+        self.amplitude = amplitude;
+        self.render()
+    }
+
+    pub fn update_phase(&mut self, phase: f32) -> Result<(), JsValue> {
+        self.phase = phase;
+        self.render()
+    }
+
+    pub fn update_freq(&mut self, freq: f32) -> Result<(), JsValue> {
+        self.freq = freq;
+        self.render()
     }
 }

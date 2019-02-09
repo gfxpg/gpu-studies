@@ -5,14 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WebGL Intro</title>
   <style>
-    body { height: 100vh; margin: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-    canvas { border: 3px solid black; margin-top: 16px; }
+    body { height: 100vh; margin: 0; }
+    body, aside { display: flex; flex-direction: column; justify-content: center; align-items: center; }
+    main { display: flex; }
+    aside { width: 180px; }
+    canvas, aside { border: 3px solid black; margin: 8px; }
+    label, input { display: block; margin-top: 8px; }
   </style>
 </head>
 <body>
   <p id="status">Loading...</p>
-  <canvas width="800" height="600"></canvas>
-  <p><label>Zoom: - <input type="range" id="scale" name="scale" value="1.0" step="0.1" min="0.1" max="1.4"> +</label></p>
+  <main>
+    <canvas width="800" height="600"></canvas>
+    <aside>
+      <h4>View</h4>
+      <label>Zoom: <span id="scale-val">0.8</span></label>
+      <input type="range" id="scale" name="scale" value="0.8" step="0.02" min="0.1" max="1.4">
+      <h4>y = A sin(wx + phi)</h4>
+      <label>Amplitude <strong>A</strong>: <span id="amplitude-val">1.0</span></label>
+      <input type="range" id="amplitude" name="amplitude" value="1.0" step="0.1" min="0.1" max="4.0">
+      <label>Phase <strong>phi</strong>: <span id="phase-val">0.0</span></label>
+      <input type="range" id="phase" name="phase" value="0.0" step="0.02" min="0.0" max="6.28">
+      <label>Ang. frequency <strong>w</strong>: <span id="freq-val">4.0</span></label>
+      <input type="range" id="freq" name="freq" value="4.0" step="0.1" min="0.1" max="20">
+    </aside>
+  </main>
   <script src="pkg/sine_wave.js"></script>
   <script type="module" src="index.js"></script>
 </body>

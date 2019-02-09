@@ -10,6 +10,15 @@ pub fn load_uniform_mat4(ctx: &WebGl2RenderingContext, program: &WebGlProgram, u
     Ok(())
 }
 
+pub fn load_uniform_f32(ctx: &WebGl2RenderingContext, program: &WebGlProgram, uniform: &str, val: f32) -> Result<(), String> {
+    let u_location = ctx.get_uniform_location(program, uniform)
+        .ok_or(format!("Unable to find the \"{}\" uniform in the current program", uniform))?;
+
+    ctx.uniform1f(Some(&u_location), val);
+
+    Ok(())
+}
+
 pub fn load_attrib(ctx: &WebGl2RenderingContext, program: &WebGlProgram, attrib: &str,
                    data: &js_sys::Object, size: i32, data_type: u32, normalized: bool) -> Result<(), String> {
     let buffer = ctx.create_buffer().ok_or("Failed to create WebGlBuffer")?;
@@ -27,21 +36,6 @@ pub fn load_attrib(ctx: &WebGl2RenderingContext, program: &WebGlProgram, attrib:
     );
     ctx.enable_vertex_attrib_array(a_location);
     ctx.vertex_attrib_pointer_with_i32(a_location, size, data_type, normalized, 0, 0);
-
-    Ok(())
-}
-
-pub fn load_texture_2d(ctx: &WebGl2RenderingContext, source: &web_sys::ImageBitmap) -> Result<(), JsValue> {
-    let texture = ctx.create_texture().ok_or("Failed to create WebGlTexture")?;
-
-    ctx.bind_texture(WebGl2RenderingContext::TEXTURE_2D, Some(&texture));
-
-    ctx.tex_image_2d_with_i32_and_i32_and_i32_and_format_and_type_and_image_bitmap(
-        WebGl2RenderingContext::TEXTURE_2D, 0, WebGl2RenderingContext::RGBA as i32,
-        source.width() as i32, source.height() as i32, 0 /* border */, WebGl2RenderingContext::RGBA, 
-        WebGl2RenderingContext::UNSIGNED_BYTE, source)?;
-    
-    ctx.generate_mipmap(WebGl2RenderingContext::TEXTURE_2D);
 
     Ok(())
 }
