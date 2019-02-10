@@ -100,13 +100,9 @@ pub fn create_logical_device(instance: &Instance, physical_device: vk::PhysicalD
 }
 
 /// Swap chain is a set of image buffers the GPU draws into and that are presented to the display
-/// hardware.
-pub fn create_swapchain<I: InstanceV1_0, D: DeviceV1_0>(
-    instance: &I, device: &D, physical_device: vk::PhysicalDevice,
-    surface: vk::SurfaceKHR, surface_loader: &Surface,
-    width: u32, height: u32
-) -> vk::SwapchainKHR {
-    // First, we need to determine the colorspace and color channel format.
+/// hardware. They are set up with a particular colorspace and color channel format.
+pub fn create_swapchain_with_surface_format(swapchain_loader: &Swapchain, physical_device: vk::PhysicalDevice,
+    surface: vk::SurfaceKHR, surface_loader: &Surface, width: u32, height: u32) -> (vk::SwapchainKHR, vk::SurfaceFormatKHR) {
     // We'll use sRGB for colorspace (https://stackoverflow.com/a/12894053/1726690) and
     // B8G8R8A8_UNORM for the format. In case they are not avilable, we just fail.
     // Real code will probably pick the most suitable out of all available.
@@ -135,7 +131,6 @@ pub fn create_swapchain<I: InstanceV1_0, D: DeviceV1_0>(
     assert!(height <= surface_capabilities.max_image_extent.height);
     let surface_resolution = vk::Extent2D { width, height };
     
-    let swapchain_loader = Swapchain::new(instance, device);
     let swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
         .surface(surface)
         .min_image_count(surface_capabilities.min_image_count)
@@ -150,7 +145,32 @@ pub fn create_swapchain<I: InstanceV1_0, D: DeviceV1_0>(
         .clipped(true)
         .image_array_layers(1);
 
-    unsafe {
+    let swapchain = unsafe {
         swapchain_loader.create_swapchain(&swapchain_create_info, None).unwrap()
+    };
+
+    (swapchain, surface_format)
+}
+
+/// An image view describes how the image is accessed (color component mapping, mipmaps, etc.)
+pub fn create_image_view(device: &Device, format: vk::Format, image: vk::Image) -> vk::ImageView {
+    let create_view_info = vk::ImageViewCreateInfo::builder()
+        .view_type(vk::ImageViewType::TYPE_2D)
+        .format(format)
+        .components(vk::ComponentMapping {
+            // Channels can be swizzled & assigned constant values of 0 and 1, but we don't need that now
+            r: vk::ComponentSwizzle::R, g: vk::ComponentSwizzle::G, b: vk::ComponentSwizzle::B, a: vk::ComponentSwizzle::A
+        })
+        .subresource_range(vk::ImageSubresourceRange {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            base_mip_level: 0,
+            level_count: 1, // no mipmap levels
+            base_array_layer: 0,
+            layer_count: 1, // multiple layers can be used e.g. for left/right views in stereographic 3D
+        })
+        .image(image);
+
+    unsafe {
+        device.create_image_view(&create_view_info, None).unwrap()
     }
 }

@@ -4,17 +4,19 @@
 #[macro_use]
 mod cffi;
 mod init;
+mod vulkan_app;
 
 use std::ffi::CStr;
-use std::os::raw::{c_char, c_void};
 use ash::vk;
+
+use vulkan_app::VulkanApp;
 
 const APP_NAME: &'static CStr = cstr!("gpu-studies");
 const WINDOW_WIDTH: f64 = 800.0;
 const WINDOW_HEIGHT: f64 = 600.0;
 
-use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
-use ash::extensions::khr::{Surface, Swapchain, WaylandSurface};
+use ash::version::{EntryV1_0, InstanceV1_0};
+use ash::extensions::khr::{Surface, WaylandSurface};
 
 fn create_surface<E: EntryV1_0, I: InstanceV1_0>(entry: &E, instance: &I, window: &winit::Window) -> vk::SurfaceKHR {
     use winit::os::unix::WindowExt;
@@ -33,9 +35,6 @@ fn create_surface<E: EntryV1_0, I: InstanceV1_0>(entry: &E, instance: &I, window
 fn main() {
     use winit::os::unix::EventsLoopExt;
 
-    let entry = ash::Entry::new().unwrap();
-    let instance = init::create_instance(APP_NAME, &entry);
-
     let events_loop = winit::EventsLoop::new_wayland();
     let window = winit::WindowBuilder::new()
         .with_title("gpu-studies")
@@ -43,18 +42,14 @@ fn main() {
         .build(&events_loop)
         .unwrap();
 
+    let entry = ash::Entry::new().unwrap();
+    let instance = init::create_instance(APP_NAME, &entry);
+
     // Vulkan API does not interface with the window system directly; instead,
     // a SurfaceKHR object is used, which represents an abstract surface
     // rendered images are presented to.
     let surface_loader = Surface::new(&entry, &instance);
     let surface: vk::SurfaceKHR = create_surface(&entry, &instance, &window);
 
-    let (p_device, queue_family_idx) =
-        init::find_physical_device_and_graphics_queue_index(&instance, surface, &surface_loader)
-        .expect("No suitable devices found");
-
-    let device = init::create_logical_device(&instance, p_device, queue_family_idx);
-
-    let swapchain = init::create_swapchain(&instance, &device, p_device,
-        surface, &surface_loader, WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32);
+    let app = VulkanApp::new(entry, instance, surface_loader, surface, &window); 
 }
