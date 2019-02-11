@@ -174,3 +174,73 @@ pub fn create_image_view(device: &Device, format: vk::Format, image: vk::Image) 
         device.create_image_view(&create_view_info, None).unwrap()
     }
 }
+
+
+/// To execute commands in Vulkan, we need to record them first in command buffer objects.
+/// Buffers are allocated from command pools, which manage the memory used to store them.
+pub fn create_command_pool_and_buffers(device: &Device, queue_family_idx: u32, buffer_count: u32) -> (vk::CommandPool, Vec<vk::CommandBuffer>) {
+    let pool_create_info = vk::CommandPoolCreateInfo::builder()
+        // RESET_COMMAND_BUFFER: any command buffer allocated from a pool can be individually reset
+        // without this flag, vkResetCommandBuffer must not be called for any buffer allocated from the pool
+        .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
+        // command pools are tied to a specific queue
+        .queue_family_index(queue_family_idx); 
+    let pool = unsafe {
+        device.create_command_pool(&pool_create_info, None).unwrap()
+    };
+
+    let buffer_allocate_info = vk::CommandBufferAllocateInfo::builder()
+        .command_buffer_count(buffer_count)
+        .command_pool(pool)
+        .level(vk::CommandBufferLevel::PRIMARY);
+    let buffers = unsafe {
+        device.allocate_command_buffers(&buffer_allocate_info).unwrap()
+    };
+
+    (pool, buffers)
+}
+
+/// While the commands for draw operations are recorded in command buffers, we also need to
+/// describe dependencies (image inputs, outputs, temporaries) so that image layout transitions
+/// and barriers are resolved automatically — this is what a render pass is for.
+/// A render pass consists of multiple subpasses — operations that depend on the results
+/// of the previous passes.
+/// Actual commands are recorded for each individual subpass. The order of execution of subpasses
+/// may be changed by the driver as long as all subpass dependencies are satisfied; subpasses
+/// may even be executed in parallel if they do not depend on each other.
+/// See https://gpuopen.com/vulkan-renderpasses/ for more information.
+pub fn create_renderpass(device: &Device, present_image_format: vk::Format) -> vk::RenderPass {
+    // Attachments describe the inputs and temporaries:
+    let renderpass_attachments = [
+        vk::AttachmentDescription {
+            format: present_image_format,
+            samples: vk::SampleCountFlags::TYPE_1,
+            load_op: vk::AttachmentLoadOp::CLEAR, // the image will be cleared to black before drawing a new frame
+            store_op: vk::AttachmentStoreOp::STORE, // rendered contents should be stored in memory (to be presented later)
+            final_layout: vk::ImageLayout::PRESENT_SRC_KHR, // the image will be presented to the screen
+            ..Default::default()
+        }
+    ];
+    // Every subpass references one or more attachments:
+    let color_attachment_refs = [
+        vk::AttachmentReference {
+            attachment: 0, // renderpass_attachments[0]
+            layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL // the attachment is used as a color buffer
+        }
+    ];
+    let subpasses = [
+        vk::SubpassDescription::builder()
+            // the index of the attachment corresponds to layout(location = ...) in the fragment shader
+            .color_attachments(&color_attachment_refs)
+            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS) // could be VK_PIPELINE_BIND_POINT_COMPUTE
+            .build()
+    ];
+    
+    let renderpass_create_info = vk::RenderPassCreateInfo::builder()
+        .attachments(&renderpass_attachments)
+        .subpasses(&subpasses);
+
+    unsafe {
+        device.create_render_pass(&renderpass_create_info, None).unwrap()
+    }
+}

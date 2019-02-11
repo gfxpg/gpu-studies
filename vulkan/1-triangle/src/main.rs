@@ -4,12 +4,12 @@
 #[macro_use]
 mod cffi;
 mod init;
-mod vulkan_app;
+mod vulkan_base;
 
 use std::ffi::CStr;
 use ash::vk;
 
-use vulkan_app::VulkanApp;
+use vulkan_base::VulkanBase;
 
 const APP_NAME: &'static CStr = cstr!("gpu-studies");
 const WINDOW_WIDTH: f64 = 800.0;
@@ -51,5 +51,5 @@ fn main() {
     let surface_loader = Surface::new(&entry, &instance);
     let surface: vk::SurfaceKHR = create_surface(&entry, &instance, &window);
 
-    let app = VulkanApp::new(entry, instance, surface_loader, surface, &window); 
+    let base = VulkanBase::new(entry, instance, surface_loader, surface, &window); 
 }

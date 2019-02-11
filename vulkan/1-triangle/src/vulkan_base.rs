@@ -1,9 +1,10 @@
 use ash::{vk, Entry, Instance, Device};
+use ash::version::DeviceV1_0;
 use ash::extensions::khr::{Surface, Swapchain};
 
 use crate::init;
 
-pub struct VulkanApp {
+pub struct VulkanBase {
     pub entry: Entry,
     pub instance: Instance,
     pub device: Device,
@@ -17,9 +18,12 @@ pub struct VulkanApp {
 
     pub present_images: Vec<vk::Image>,
     pub present_image_views: Vec<vk::ImageView>,
+
+    pub present_queue: vk::Queue,
+    pub command_buffers: Vec<vk::CommandBuffer>
 }
 
-impl VulkanApp {
+impl VulkanBase {
     pub fn new(entry: Entry, instance: Instance, surface_loader: Surface, surface: vk::SurfaceKHR, window: &winit::Window) -> Self {
         let (physical_device, queue_family_idx) =
             init::find_physical_device_and_graphics_queue_index(&instance, surface, &surface_loader)
@@ -39,9 +43,19 @@ impl VulkanApp {
         let present_image_views: Vec<vk::ImageView> = present_images
             .iter().map(|&image| init::create_image_view(&device, surface_format.format, image)).collect();
 
+        let (command_pool, command_buffers) = init::create_command_pool_and_buffers(&device, queue_family_idx,
+            // During rendering, buffers are bound to a particular image, so we need to create as many as there are images:
+            present_images.len() as u32);
+
+        let renderpass = init::create_renderpass(&device, surface_format.format);
+
+        let present_queue = unsafe {
+            device.get_device_queue(queue_family_idx, 0)
+        };
+
         Self {
             entry, instance, device, physical_device, surface_loader, surface, swapchain_loader, swapchain,
-            present_images, present_image_views
+            present_images, present_image_views, present_queue, command_buffers
         }
     }
 }
