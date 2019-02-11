@@ -70,46 +70,8 @@ fn main() {
     events_loop.run_forever(|event| {
         use winit::{Event, WindowEvent, VirtualKeyCode, ControlFlow};
 
-        let (present_idx, _) = unsafe {
-            base.swapchain_loader.acquire_next_image(base.swapchain, std::u64::MAX,
-                base.present_complete_semaphore, vk::Fence::null()).unwrap()
-        };
-
-        base.submit_command_buffer(present_idx as usize, |device, cmd_buf| {
-            let clear_values = [
-                vk::ClearValue {
-                    color: vk::ClearColorValue {
-                        float32: [1.0, 0.8, 0.4, 1.0]
-                    }
-                }
-            ];
-            let renderpass_begin_info = vk::RenderPassBeginInfo::builder()
-                .render_pass(base.renderpass)
-                .framebuffer(base.framebuffers[present_idx as usize])
-                .render_area(vk::Rect2D {
-                    offset: vk::Offset2D { x: 0, y: 0 },
-                    extent: base.surface_resolution.clone(),
-                })
-                .clear_values(&clear_values);
-            
-            unsafe {
-                device.cmd_begin_render_pass(cmd_buf, &renderpass_begin_info, vk::SubpassContents::INLINE);
-
-                device.cmd_end_render_pass(cmd_buf);
-            }
+        base.renderpass_with_image_idx(|idx, cmd_buf| {
         });
-
-        let wait_semaphors = [base.rendering_complete_semaphore];
-        let swapchains = [base.swapchain];
-        let image_indices = [present_idx];
-        let present_info = vk::PresentInfoKHR::builder()
-            .wait_semaphores(&wait_semaphors)
-            .swapchains(&swapchains)
-            .image_indices(&image_indices);
-
-        unsafe {
-            base.swapchain_loader.queue_present(base.present_queue, &present_info).unwrap();
-        }
 
         match event {
             Event::WindowEvent { event, .. } => match event {

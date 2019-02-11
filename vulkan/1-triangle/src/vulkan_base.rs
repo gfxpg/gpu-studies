@@ -98,7 +98,56 @@ impl VulkanBase {
         }
     }
 
-    pub fn submit_command_buffer<F: FnOnce(&Device, vk::CommandBuffer)>(&self, image_idx: usize, f: F) {
+    pub fn renderpass_with_image_idx<F: FnOnce(u32, vk::CommandBuffer)>(&self, f: F) {
+        let (present_idx, _) = unsafe {
+            self.swapchain_loader.acquire_next_image(self.swapchain, std::u64::MAX,
+                self.present_complete_semaphore, vk::Fence::null()).unwrap()
+        };
+
+        self.submit_command_buffer(present_idx as usize, || {
+            let clear_values = [
+                vk::ClearValue {
+                    color: vk::ClearColorValue {
+                        float32: [1.0, 0.8, 0.4, 1.0]
+                    }
+                }
+            ];
+            let renderpass_begin_info = vk::RenderPassBeginInfo::builder()
+                .render_pass(self.renderpass)
+                .framebuffer(self.framebuffers[present_idx as usize])
+                .render_area(vk::Rect2D {
+                    offset: vk::Offset2D { x: 0, y: 0 },
+                    extent: self.surface_resolution.clone(),
+                })
+                .clear_values(&clear_values);
+
+            let cmd_buf = self.command_buffers[present_idx as usize];
+
+            unsafe {
+                self.device.cmd_begin_render_pass(cmd_buf, &renderpass_begin_info, vk::SubpassContents::INLINE);
+            }
+            
+            f(present_idx, cmd_buf);
+
+            unsafe {
+                self.device.cmd_end_render_pass(cmd_buf);
+            }
+        });
+
+        let wait_semaphors = [self.rendering_complete_semaphore];
+        let swapchains = [self.swapchain];
+        let image_indices = [present_idx];
+        let present_info = vk::PresentInfoKHR::builder()
+            .wait_semaphores(&wait_semaphors)
+            .swapchains(&swapchains)
+            .image_indices(&image_indices);
+
+        unsafe {
+            self.swapchain_loader.queue_present(self.present_queue, &present_info).unwrap();
+        }
+    }
+
+    pub fn submit_command_buffer<F: FnOnce()>(&self, image_idx: usize, f: F) {
         let command_buffer = self.command_buffers[image_idx];
 
         unsafe {
@@ -115,7 +164,7 @@ impl VulkanBase {
             self.device.begin_command_buffer(command_buffer, &command_buffer_begin_info).unwrap();
         }
 
-        f(&self.device, command_buffer);
+        f();
 
         unsafe {
             self.device.end_command_buffer(command_buffer).unwrap();
@@ -127,7 +176,7 @@ impl VulkanBase {
 
         let command_buffers = [command_buffer];
         let wait_semaphores = [self.present_complete_semaphore];
-        let signal_semaphores = [self.rendering_complete_semaphore];
+        let signal_semaphores = [self.rendering_complete_semaphore]; // this semaphore will be signaled once command buffer finishes execution
         let wait_mask = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
 
         let submit_info = vk::SubmitInfo::builder()
