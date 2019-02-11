@@ -15,6 +15,9 @@ const APP_NAME: &'static CStr = cstr!("gpu-studies");
 const WINDOW_WIDTH: f64 = 800.0;
 const WINDOW_HEIGHT: f64 = 600.0;
 
+const VERT_SHADER_SPIRV: &'static [u8] = include_bytes!(concat!(env!("OUT_DIR"), "/triangle.vert.spv"));
+const FRAG_SHADER_SPIRV: &'static [u8] = include_bytes!(concat!(env!("OUT_DIR"), "/triangle.frag.spv"));
+
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
 use ash::extensions::khr::{Surface, WaylandSurface};
 

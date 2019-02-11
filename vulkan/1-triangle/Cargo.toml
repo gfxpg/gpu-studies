@@ -3,7 +3,11 @@ name = "triangle"
 version = "0.1.0"
 authors = ["timlathy <tim.labushev@gmail.com>"]
 edition = "2018"
+build = "build.rs"
 
 [dependencies]
 ash = "0.27.1"
 winit = "0.18.1"
+
+[build-dependencies]
+shaderc = "0.3"
