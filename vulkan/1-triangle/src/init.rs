@@ -101,8 +101,8 @@ pub fn create_logical_device(instance: &Instance, physical_device: vk::PhysicalD
 
 /// Swap chain is a set of image buffers the GPU draws into and that are presented to the display
 /// hardware. They are set up with a particular colorspace and color channel format.
-pub fn create_swapchain_with_surface_format(swapchain_loader: &Swapchain, physical_device: vk::PhysicalDevice,
-    surface: vk::SurfaceKHR, surface_loader: &Surface, width: u32, height: u32) -> (vk::SwapchainKHR, vk::SurfaceFormatKHR) {
+pub fn create_swapchain_with_surface(swapchain_loader: &Swapchain, physical_device: vk::PhysicalDevice,
+    surface: vk::SurfaceKHR, surface_loader: &Surface, resolution: vk::Extent2D) -> (vk::SwapchainKHR, vk::SurfaceFormatKHR) {
     // We'll use sRGB for colorspace (https://stackoverflow.com/a/12894053/1726690) and
     // B8G8R8A8_UNORM for the format. In case they are not avilable, we just fail.
     // Real code will probably pick the most suitable out of all available.
@@ -127,16 +127,15 @@ pub fn create_swapchain_with_surface_format(swapchain_loader: &Swapchain, physic
     let surface_capabilities = unsafe {
         surface_loader.get_physical_device_surface_capabilities(physical_device, surface).unwrap()
     };
-    assert!(width <= surface_capabilities.max_image_extent.width);
-    assert!(height <= surface_capabilities.max_image_extent.height);
-    let surface_resolution = vk::Extent2D { width, height };
+    assert!(resolution.width <= surface_capabilities.max_image_extent.width);
+    assert!(resolution.height <= surface_capabilities.max_image_extent.height);
     
     let swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
         .surface(surface)
         .min_image_count(surface_capabilities.min_image_count)
         .image_color_space(surface_format.color_space)
         .image_format(surface_format.format)
-        .image_extent(surface_resolution)
+        .image_extent(resolution)
         .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
         .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
         .pre_transform(surface_capabilities.current_transform)
