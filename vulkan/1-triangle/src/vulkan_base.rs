@@ -2,7 +2,7 @@ use ash::{vk, Entry, Instance, Device};
 use ash::version::DeviceV1_0;
 use ash::extensions::khr::{Surface, Swapchain};
 
-use crate::init;
+use crate::{init, pipeline};
 
 pub struct VulkanBase {
     pub entry: Entry,
@@ -25,6 +25,7 @@ pub struct VulkanBase {
 
     pub renderpass: vk::RenderPass,
     pub framebuffers: Vec<vk::Framebuffer>,
+    pub pipeline: vk::Pipeline,
 
     pub present_complete_semaphore: vk::Semaphore,
     pub rendering_complete_semaphore: vk::Semaphore,
@@ -78,6 +79,12 @@ impl VulkanBase {
             })
             .collect();
 
+        let present_queue = unsafe {
+            device.get_device_queue(queue_family_idx, 0)
+        };
+
+        let pipeline = pipeline::create(&device, surface_resolution, renderpass);
+
         let semaphore_create_info = vk::SemaphoreCreateInfo::default();
         let present_complete_semaphore = unsafe {
             device.create_semaphore(&semaphore_create_info, None).unwrap()
@@ -86,14 +93,10 @@ impl VulkanBase {
             device.create_semaphore(&semaphore_create_info, None).unwrap()
         };
 
-        let present_queue = unsafe {
-            device.get_device_queue(queue_family_idx, 0)
-        };
-
         Self {
             entry, instance, device, physical_device, surface_loader, surface, surface_resolution,
             swapchain_loader, swapchain, present_images, present_image_views, present_queue,
-            command_buffers, renderpass, framebuffers,
+            command_buffers, renderpass, framebuffers, pipeline,
             present_complete_semaphore, rendering_complete_semaphore
         }
     }
