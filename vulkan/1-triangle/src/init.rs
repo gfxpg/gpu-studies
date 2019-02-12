@@ -1,7 +1,7 @@
 use std::ffi::CStr;
 use ash::{vk, vk_make_version, Entry, Instance, Device};
 use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
-use ash::extensions::{ext::DebugReport, khr::{Surface, Swapchain, WaylandSurface}};
+use ash::extensions::{ext::DebugUtils, khr::{Surface, Swapchain, WaylandSurface}};
 
 const VK_API_VERSION: u32 = vk_make_version!(1, 1, 0);
 const VK_ENABLED_LAYERS: [&'static CStr; 1] = [
@@ -29,7 +29,7 @@ pub fn create_instance(app_name: &CStr, entry: &Entry) -> Instance {
     let instance_extensions = [
         Surface::name().as_ptr(),
         WaylandSurface::name().as_ptr(),
-        DebugReport::name().as_ptr()
+        DebugUtils::name().as_ptr()
     ];
 
     let create_info = vk::InstanceCreateInfo::builder()

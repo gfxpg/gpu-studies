@@ -54,27 +54,28 @@ fn main() {
     let surface_loader = Surface::new(&entry, &instance);
     let surface: vk::SurfaceKHR = create_surface(&entry, &instance, &window);
 
-    let base = VulkanBase::new(entry, instance, surface_loader, surface, &window); 
-
-    use ash::extensions::ext::DebugReport;
-    let debug_info = vk::DebugReportCallbackCreateInfoEXT::builder()
-        .flags(
-            vk::DebugReportFlagsEXT::ERROR
-                | vk::DebugReportFlagsEXT::INFORMATION
-                | vk::DebugReportFlagsEXT::WARNING
-                | vk::DebugReportFlagsEXT::PERFORMANCE_WARNING
+    use ash::extensions::ext::DebugUtils;
+    let debug_create_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
+        .message_severity(
+            vk::DebugUtilsMessageSeverityFlagsEXT::ERROR
+                | vk::DebugUtilsMessageSeverityFlagsEXT::WARNING
         )
-        .pfn_callback(Some(vulkan_debug_callback));
-    let debug_report_loader = DebugReport::new(&base.entry, &base.instance);
-    let debug_callback = unsafe {
-        debug_report_loader.create_debug_report_callback(&debug_info, None).unwrap()
+        .message_type(
+            vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
+                | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION
+                | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE
+        )
+        .pfn_user_callback(Some(vulkan_debug_callback));
+    let debug_utils_loader = DebugUtils::new(&entry, &instance);
+    let debug_messenger = unsafe {
+        debug_utils_loader.create_debug_utils_messenger(&debug_create_info, None).unwrap()
     };
+
+    let base = VulkanBase::new(entry, instance, surface_loader, surface, &window); 
 
     events_loop.run_forever(|event| {
         use winit::{Event, WindowEvent, VirtualKeyCode, ControlFlow};
 
-        base.renderpass_with_image_idx(|idx, cmd_buf| {
-        });
 
         match event {
             Event::WindowEvent { event, .. } => match event {
@@ -93,18 +94,15 @@ fn main() {
     });
 }
 
-use std::os::raw::{c_char, c_void};
-
 unsafe extern "system" fn vulkan_debug_callback(
-    _: vk::DebugReportFlagsEXT,
-    _: vk::DebugReportObjectTypeEXT,
-    _: u64,
-    _: usize,
-    _: i32,
-    _: *const c_char,
-    p_message: *const c_char,
-    _: *mut c_void,
+    _severity: vk::DebugUtilsMessageSeverityFlagsEXT,
+    _types: vk::DebugUtilsMessageTypeFlagsEXT,
+    p_callback_data: *const vk::DebugUtilsMessengerCallbackDataEXT,
+    _p_user_data: *mut std::os::raw::c_void
 ) -> u32 {
-    println!("vk: {:?}", CStr::from_ptr(p_message));
+    eprintln!("vk: #{} [{}] {}",
+              (*p_callback_data).message_id_number,
+              CStr::from_ptr((*p_callback_data).p_message_id_name).to_str().unwrap(),
+              CStr::from_ptr((*p_callback_data).p_message).to_str().unwrap());
     vk::FALSE
 }
