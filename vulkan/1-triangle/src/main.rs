@@ -16,7 +16,7 @@ const APP_NAME: &'static CStr = cstr!("gpu-studies");
 const WINDOW_WIDTH: f64 = 800.0;
 const WINDOW_HEIGHT: f64 = 600.0;
 
-use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
+use ash::version::{EntryV1_0, InstanceV1_0};
 use ash::extensions::khr::{Surface, WaylandSurface};
 
 fn create_surface<E: EntryV1_0, I: InstanceV1_0>(entry: &E, instance: &I, window: &winit::Window) -> vk::SurfaceKHR {
@@ -65,7 +65,7 @@ fn main() {
         )
         .pfn_user_callback(Some(vulkan_debug_callback));
     let debug_utils_loader = DebugUtils::new(&entry, &instance);
-    let debug_messenger = unsafe {
+    let _debug_messenger = unsafe {
         debug_utils_loader.create_debug_utils_messenger(&debug_create_info, None).unwrap()
     };
 
@@ -74,6 +74,7 @@ fn main() {
     events_loop.run_forever(|event| {
         use winit::{Event, WindowEvent, VirtualKeyCode, ControlFlow};
 
+        base.draw_frame();
 
         match event {
             Event::WindowEvent { event, .. } => match event {

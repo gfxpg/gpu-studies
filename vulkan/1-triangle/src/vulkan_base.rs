@@ -53,7 +53,7 @@ impl VulkanBase {
         let present_image_views: Vec<vk::ImageView> = present_images
             .iter().map(|&image| init::create_image_view(&device, surface_format.format, image)).collect();
 
-        let (command_pool, command_buffers) = init::create_command_pool_and_buffers(&device, queue_family_idx,
+        let (_command_pool, command_buffers) = init::create_command_pool_and_buffers(&device, queue_family_idx,
             // During rendering, buffers are bound to a particular image, so we need to create as many as there are images:
             present_images.len() as u32);
 
@@ -101,7 +101,7 @@ impl VulkanBase {
         }
     }
 
-    pub fn renderpass_with_image_idx<F: FnOnce(u32, vk::CommandBuffer)>(&self, f: F) {
+    pub fn draw_frame(&self) {
         let (present_idx, _) = unsafe {
             self.swapchain_loader.acquire_next_image(self.swapchain, std::u64::MAX,
                 self.present_complete_semaphore, vk::Fence::null()).unwrap()
@@ -111,7 +111,7 @@ impl VulkanBase {
             let clear_values = [
                 vk::ClearValue {
                     color: vk::ClearColorValue {
-                        float32: [1.0, 0.8, 0.4, 1.0]
+                        float32: [0.0, 0.0, 0.0, 1.0]
                     }
                 }
             ];
@@ -128,11 +128,8 @@ impl VulkanBase {
 
             unsafe {
                 self.device.cmd_begin_render_pass(cmd_buf, &renderpass_begin_info, vk::SubpassContents::INLINE);
-            }
-            
-            f(present_idx, cmd_buf);
-
-            unsafe {
+                self.device.cmd_bind_pipeline(cmd_buf, vk::PipelineBindPoint::GRAPHICS, self.pipeline);
+                self.device.cmd_draw(cmd_buf, 3, 1, 0, 0);
                 self.device.cmd_end_render_pass(cmd_buf);
             }
         });

@@ -1,6 +1,6 @@
 use std::ffi::CStr;
-use ash::{vk, Entry, Instance, Device};
-use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
+use ash::{vk, Device};
+use ash::version::DeviceV1_0;
 
 const SHADER_ENTRY_NAME: &'static CStr = cstr!("main");
 const VERT_SHADER_SPIRV: &'static [u8] = include_bytes!(concat!(env!("OUT_DIR"), "/triangle.vert.spv"));
