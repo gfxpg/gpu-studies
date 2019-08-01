@@ -1,6 +1,8 @@
 #include <iostream>
 #include <pngwriter.h>
 
+#include "vec3.hpp"
+
 int main(int, char**) {
   pngwriter png(300, 300, 0, "test.png");
 
