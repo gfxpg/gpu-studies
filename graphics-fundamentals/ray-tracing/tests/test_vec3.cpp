@@ -43,6 +43,12 @@ TEST_CASE("scalar vector division", "[vec3]") {
   REQUIRE(div.z == Approx(0.035f));
 }
 
+TEST_CASE("vector dot product", "[vec3]") {
+  constexpr auto dot = Vec3(1.0, 2.0, 3.0).dot(Vec3(1.0, 5.0, 7.0));
+
+  REQUIRE(dot == Approx(32.0f));
+}
+
 TEST_CASE("vector negation", "[vec3]") {
   constexpr auto negated = -Vec3(0.1, 0.2, 0.3);
 
