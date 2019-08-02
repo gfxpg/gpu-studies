@@ -1,3 +1,4 @@
+#pragma once
 #include <cmath>
 
 class Vec3 {
@@ -41,6 +42,9 @@ class Vec3 {
   friend constexpr Vec3 operator*(Vec3 const& lhs, float rhs) {
     return Vec3(lhs) *= rhs;
   }
+  friend constexpr Vec3 operator*(float lhs, Vec3 const& rhs) {
+    return Vec3(rhs) *= lhs;
+  }
   friend constexpr Vec3 operator/(Vec3 const& lhs, float rhs) {
     return Vec3(lhs) /= rhs;
   }
@@ -48,6 +52,7 @@ class Vec3 {
   constexpr Vec3 operator-() const { return Vec3(-x, -y, -z); }
   constexpr float length() const { return std::sqrt(x * x + y * y + z * z); }
   constexpr float squared_length() const { return x * x + y * y + z * z; }
+  constexpr Vec3 unit_vector() const { return *this / length(); }
 
   union {
     struct {

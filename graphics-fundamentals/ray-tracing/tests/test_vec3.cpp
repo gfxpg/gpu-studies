@@ -24,10 +24,15 @@ TEST_CASE("vector subtraction", "[vec3]") {
 
 TEST_CASE("scalar vector multiplication", "[vec3]") {
   constexpr auto mul = Vec3(0.15, 0.25, 0.35) * 10.0f;
+  constexpr auto mul2 = 10.0f * Vec3(0.15, 0.25, 0.35);
 
   REQUIRE(mul.x == Approx(1.5f));
   REQUIRE(mul.y == Approx(2.5f));
   REQUIRE(mul.z == Approx(3.5f));
+
+  REQUIRE(mul2.x == Approx(1.5f));
+  REQUIRE(mul2.y == Approx(2.5f));
+  REQUIRE(mul2.z == Approx(3.5f));
 }
 
 TEST_CASE("scalar vector division", "[vec3]") {
@@ -53,4 +58,12 @@ TEST_CASE("vector length", "[vec3]") {
 
   REQUIRE(len == Approx(3.74165f));
   REQUIRE(len_sq == Approx(14.0f));
+}
+
+TEST_CASE("unit vector", "[vec3]") {
+  constexpr auto unit = Vec3(14.0, 6.0, 5.0).unit_vector();
+
+  REQUIRE(unit.x == Approx(0.8733f));
+  REQUIRE(unit.y == Approx(0.37427f));
+  REQUIRE(unit.z == Approx(0.31189f));
 }
