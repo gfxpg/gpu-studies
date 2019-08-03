@@ -1,17 +1,20 @@
 #include <pngwriter.h>
 #include <iostream>
 
-#include "ray.hpp"
-#include "vec3.hpp"
+#include "sphere.hpp"
 
 // "a function declared with constexpr is implicitly an inline function"
 constexpr Vec3 linear_interp(const Vec3& start, const Vec3& end, float t) {
   return (1.0 - t) * start + t * end;
 }
 
-Vec3 ray_color(const Ray& r) {
+Vec3 ray_color(const Ray& r, const Surface& surface) {
   const Vec3 white = Vec3(1.0, 1.0, 1.0);
   const Vec3 blue = Vec3(0.5, 0.7, 1.0);
+
+  auto hit = surface.hit(r, 0.0, std::numeric_limits<float>::max());
+  if (hit)
+    return 0.5 * Vec3(hit->normal.x + 1, hit->normal.y + 1, hit->normal.z + 1);
 
   float y_unit = r.direction().unit_vector().y;  // -1.0 < y < 1.0
   float t = 0.5 * (y_unit + 1.0);  // 0.5 * (0.0 < y < 2.0) = 0.0 < t < 1.0
@@ -24,6 +27,7 @@ int main(int, char**) {
   Vec3 horizontal(-lower_left_corner.x * 2, 0.0, 0.0);
   Vec3 vertical(0.0, -lower_left_corner.y * 2, 0.0);
   Vec3 origin(0.0, 0.0, 0.0);
+  Sphere sphere(Vec3(0, 0, -1), 0.5);
 
   pngwriter png(width, height, 0, "test.png");
 
@@ -32,7 +36,7 @@ int main(int, char**) {
       float u = float(x) / width;
       float v = float(y) / height;
       Ray r(origin, lower_left_corner + u * horizontal + v * vertical);
-      Vec3 color = ray_color(r);
+      Vec3 color = ray_color(r, sphere);
       png.plot(x, y, color.r, color.g, color.b);
     }
 

@@ -4,7 +4,7 @@ find_package(PNGwriter 0.7.0)
 
 add_executable(ray-tracing
   main.cpp
-  vec3.hpp
+  sphere.cpp
 )
 
 target_link_libraries(ray-tracing PRIVATE PNGwriter::PNGwriter)
