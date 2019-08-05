@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.14)
 add_executable(tests
   main.cpp
   test_vec3.cpp
+  surfaces/test_world.cpp
 )
 
 target_link_libraries(tests Catch2::Catch2)

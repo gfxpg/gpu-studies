@@ -1,6 +1,6 @@
 #pragma once
 #include <optional>
-#include "ray.hpp"
+#include "../ray.hpp"
 
 struct SurfaceHit {
   float t;
@@ -15,5 +15,7 @@ struct SurfaceHit {
 
 class Surface {
  public:
-  virtual std::optional<SurfaceHit> hit(const Ray& r, float t_min, float t_max) const = 0;
+  virtual ~Surface() {}
+  virtual std::optional<SurfaceHit> hit(const Ray& r, float t_min,
+                                        float t_max) const = 0;
 };

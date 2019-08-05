@@ -1,7 +1,8 @@
 #include <pngwriter.h>
 #include <iostream>
 
-#include "sphere.hpp"
+#include "surfaces/sphere.hpp"
+#include "surfaces/world.hpp"
 
 // "a function declared with constexpr is implicitly an inline function"
 constexpr Vec3 linear_interp(const Vec3& start, const Vec3& end, float t) {
@@ -27,7 +28,11 @@ int main(int, char**) {
   Vec3 horizontal(-lower_left_corner.x * 2, 0.0, 0.0);
   Vec3 vertical(0.0, -lower_left_corner.y * 2, 0.0);
   Vec3 origin(0.0, 0.0, 0.0);
-  Sphere sphere(Vec3(0, 0, -1), 0.5);
+
+  std::vector<std::unique_ptr<Surface>> surfaces;
+  surfaces.push_back(std::make_unique<Sphere>(Vec3(0.0, 0.0, -1.0), 0.5));
+  surfaces.push_back(std::make_unique<Sphere>(Vec3(0.0, -100.5, -1), 100.0));
+  auto world = World(std::move(surfaces));
 
   pngwriter png(width, height, 0, "test.png");
 
@@ -36,7 +41,7 @@ int main(int, char**) {
       float u = float(x) / width;
       float v = float(y) / height;
       Ray r(origin, lower_left_corner + u * horizontal + v * vertical);
-      Vec3 color = ray_color(r, sphere);
+      Vec3 color = ray_color(r, world);
       png.plot(x, y, color.r, color.g, color.b);
     }
 
