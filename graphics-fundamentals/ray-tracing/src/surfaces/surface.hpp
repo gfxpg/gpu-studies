@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include <optional>
 #include "../ray.hpp"
 
@@ -13,9 +14,14 @@ struct SurfaceHit {
   Vec3 normal;
 };
 
+class Material;  // circular reference
+
+typedef std::optional<std::pair<SurfaceHit, std::shared_ptr<Material>>>
+    SurfaceHitResult;
+
 class Surface {
  public:
   virtual ~Surface() {}
-  virtual std::optional<SurfaceHit> hit(const Ray& r, float t_min,
-                                        float t_max) const = 0;
+  virtual SurfaceHitResult hit(const Ray& r, float t_min,
+                               float t_max) const = 0;
 };

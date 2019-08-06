@@ -6,6 +6,7 @@
 #include "camera.hpp"
 #include "surfaces/sphere.hpp"
 #include "surfaces/world.hpp"
+#include "materials/material.hpp"
 
 // "a function declared with constexpr is implicitly an inline function"
 constexpr Vec3 linear_interp(const Vec3& start, const Vec3& end, float t) {
@@ -16,9 +17,11 @@ Vec3 ray_color(const Surface& surface, const Ray& r) {
   const Vec3 white = Vec3(1.0, 1.0, 1.0);
   const Vec3 blue = Vec3(0.5, 0.7, 1.0);
 
-  auto hit = surface.hit(r, 0.0, std::numeric_limits<float>::max());
-  if (hit)
-    return 0.5 * Vec3(hit->normal.x + 1, hit->normal.y + 1, hit->normal.z + 1);
+  auto hit_result = surface.hit(r, 0.0, std::numeric_limits<float>::max());
+  if (hit_result) {
+    auto& [hit, material] = *hit_result;
+    return 0.5 * Vec3(hit.normal.x + 1, hit.normal.y + 1, hit.normal.z + 1);
+  }
 
   float y_unit = r.direction().unit_vector().y;  // -1.0 < y < 1.0
   float t = 0.5 * (y_unit + 1.0);  // 0.5 * (0.0 < y < 2.0) = 0.0 < t < 1.0
@@ -29,8 +32,9 @@ int main(int, char**) {
   int width = 400, height = 200, samples_per_pixel = 10;
 
   std::vector<std::unique_ptr<Surface>> surfaces;
-  surfaces.push_back(std::make_unique<Sphere>(Vec3(0.0, 0.0, -1.0), 0.5));
-  surfaces.push_back(std::make_unique<Sphere>(Vec3(0.0, -100.5, -1), 100.0));
+  auto material = std::shared_ptr<Material>();
+  surfaces.push_back(std::make_unique<Sphere>(Vec3(0.0, 0.0, -1.0), 0.5, material));
+  surfaces.push_back(std::make_unique<Sphere>(Vec3(0.0, -100.5, -1), 100.0, material));
   auto world = World(std::move(surfaces));
 
   Camera camera(samples_per_pixel);

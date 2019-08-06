@@ -1,15 +1,16 @@
 #pragma once
+#include <memory>
 #include "surface.hpp"
 
 class Sphere : public Surface {
  public:
   Sphere() {}
-  Sphere(Vec3 center, float radius) : center(center), radius(radius) {}
+  Sphere(Vec3 center, float radius, std::shared_ptr<Material> material)
+      : center(center), radius(radius), material(material) {}
 
   // The explanation is based on Fundamentals of Computer Graphics
   // by Peter Shirley, Steve Marschner.
-  virtual std::optional<SurfaceHit> hit(const Ray& r, float t_min,
-                                        float t_max) const {
+  virtual SurfaceHitResult hit(const Ray& r, float t_min, float t_max) const {
     // The equation of a sphere is (x-x_c)^2 + (y-y_c)^2 + (z-z_c)^2 = R^2,
     // where c = (x_c,y_c,z_c) is the center, R is the radius. In vector form,
     // it becomes dot(p-c,p-c) = R^2. Any point p that satisfies the equation is
@@ -39,10 +40,11 @@ class Sphere : public Surface {
     Vec3 pt = r.point_at(t);
     Vec3 surface_normal = (pt - this->center) / this->radius;
 
-    return {SurfaceHit{t, pt, surface_normal}};
+    return {{SurfaceHit{t, pt, surface_normal}, this->material}};
   }
 
  private:
   Vec3 center;
   float radius;
+  std::shared_ptr<Material> material;
 };
