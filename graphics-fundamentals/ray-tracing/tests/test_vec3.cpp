@@ -49,6 +49,14 @@ TEST_CASE("vector dot product", "[vec3]") {
   REQUIRE(dot == Approx(32.0f));
 }
 
+TEST_CASE("vector elementwise multiplication", "[vec3]") {
+  constexpr auto eltwise = Vec3(1.0, 2.0, 3.0).eltwise_mul(Vec3(1.0, 5.0, 7.0));
+
+  REQUIRE(eltwise.x == Approx(1.0));
+  REQUIRE(eltwise.y == Approx(10.0));
+  REQUIRE(eltwise.z == Approx(21.0));
+}
+
 TEST_CASE("vector negation", "[vec3]") {
   constexpr auto negated = -Vec3(0.1, 0.2, 0.3);
 

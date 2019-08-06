@@ -53,6 +53,10 @@ class Vec3 {
     return x * rhs.x + y * rhs.y + z * rhs.z;
   }
 
+  constexpr Vec3 eltwise_mul(Vec3 const& rhs) const {
+    return Vec3(x * rhs.x, y * rhs.y, z * rhs.z);
+  }
+
   constexpr Vec3 operator-() const { return Vec3(-x, -y, -z); }
   constexpr float length() const { return std::sqrt(x * x + y * y + z * z); }
   constexpr float squared_length() const { return x * x + y * y + z * z; }
