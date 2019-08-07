@@ -12,20 +12,21 @@ constexpr Vec3 linear_interp(const Vec3& start, const Vec3& end, float t) {
   return (1.0 - t) * start + t * end;
 }
 
-constexpr int max_ray_bounces = 2;
+constexpr int max_ray_bounces = 4;
 
-Vec3 ray_color(const Surface& surface, const Ray& r, int bounces) {
+Vec3 ray_color(const Surface& surface, const Ray& r, int bounces,
+               std::function<Vec3()> rnd) {
   const Vec3 white = Vec3(1.0, 1.0, 1.0);
   const Vec3 blue = Vec3(0.5, 0.7, 1.0);
 
-  auto hit_result = surface.hit(r, 0.0, std::numeric_limits<float>::max());
+  auto hit_result = surface.hit(r, 0.001, std::numeric_limits<float>::max());
   if (hit_result) {
-    auto& [hit, material] = *hit_result;
+    auto [hit, material] = *hit_result;
     if (bounces < max_ray_bounces) {
       auto scatter_result = material->scatter(r, hit);
       if (scatter_result) {
         return scatter_result->attenuation.eltwise_mul(
-            ray_color(surface, scatter_result->ray, bounces + 1));
+            ray_color(surface, scatter_result->ray, bounces + 1, rnd));
       }
     }
     return Vec3(0, 0, 0);
@@ -37,27 +38,31 @@ Vec3 ray_color(const Surface& surface, const Ray& r, int bounces) {
 }
 
 int main(int, char**) {
-  int width = 200, height = 100, samples_per_pixel = 8;
+  int width = 200, height = 100, samples_per_pixel = 10;
 
   Camera camera(samples_per_pixel);
+
   Rnd rnd;
+  std::function<float()> rnd_float = std::bind(&Rnd::random, std::ref(rnd));
+  std::function<Vec3()> rnd_sphere =
+      std::bind(&Rnd::random_in_unit_sphere, std::ref(rnd));
 
   std::vector<std::unique_ptr<Surface>> surfaces;
-  auto material =
-      std::make_shared<Lambertian>(Vec3(0.5, 0.5, 0.5), rnd.gen_in_unit_sphere);
+  auto material = std::make_shared<Lambertian>(Vec3(0.5, 0.5, 0.5), rnd_sphere);
   surfaces.push_back(
       std::make_unique<Sphere>(Vec3(0.0, 0.0, -1.0), 0.5, material));
   surfaces.push_back(
       std::make_unique<Sphere>(Vec3(0.0, -100.5, -1), 100.0, material));
   auto world = World(std::move(surfaces));
 
-  std::function<Vec3(const Ray&)> ray_color_fn = std::bind(
-      ray_color, std::cref((Surface&)world), std::placeholders::_1, 0);
+  std::function<Vec3(const Ray&)> ray_color_fn =
+      std::bind(ray_color, std::cref((Surface&)world), std::placeholders::_1, 0,
+                rnd_sphere);
 
   pngwriter png(width, height, 0, "test.png");
   for (int y = height - 1; y >= 0; --y)
     for (int x = 0; x < width; ++x) {
-      Vec3 color = camera.avgsample_pixel_color(x, y, width, height, rnd.gen,
+      Vec3 color = camera.avgsample_pixel_color(x, y, width, height, rnd_float,
                                                 ray_color_fn);
       png.plot(x, y, color.r, color.g, color.b);
     }
