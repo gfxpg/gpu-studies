@@ -3,6 +3,7 @@
 
 #include "camera.hpp"
 #include "materials/lambertian.hpp"
+#include "materials/metal.hpp"
 #include "rnd.hpp"
 #include "surfaces/sphere.hpp"
 #include "surfaces/world.hpp"
@@ -48,11 +49,14 @@ int main(int, char**) {
       std::bind(&Rnd::random_in_unit_sphere, std::ref(rnd));
 
   std::vector<std::unique_ptr<Surface>> surfaces;
-  auto material = std::make_shared<Lambertian>(Vec3(0.5, 0.5, 0.5), rnd_sphere);
+  auto matte = std::make_shared<Lambertian>(Vec3(0.5, 0.5, 0.5), rnd_sphere);
+  auto metal = std::make_shared<Metal>(Vec3(0.5, 0.5, 0.5), /* fuzziness */ 0.4, rnd_sphere);
   surfaces.push_back(
-      std::make_unique<Sphere>(Vec3(0.0, 0.0, -1.0), 0.5, material));
+      std::make_unique<Sphere>(Vec3(0.0, -100.5, -1), 100.0, matte));
   surfaces.push_back(
-      std::make_unique<Sphere>(Vec3(0.0, -100.5, -1), 100.0, material));
+      std::make_unique<Sphere>(Vec3(0.0, 0.0, -1.1), 0.5, matte));
+  surfaces.push_back(
+      std::make_unique<Sphere>(Vec3(1.0, 0.0, -1.1), 0.5, metal));
   auto world = World(std::move(surfaces));
 
   std::function<Vec3(const Ray&)> ray_color_fn =
