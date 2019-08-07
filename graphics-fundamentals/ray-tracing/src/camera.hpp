@@ -27,7 +27,14 @@ class Camera {
       color += ray_color(r);
     }
 
-    return color / float(num_samples_per_pixel);
+    return gamma_encode_color(color / float(num_samples_per_pixel));
+  }
+
+  static Vec3 gamma_encode_color(Vec3 color) {
+    // out = in^gamma, "in most computer display systems, images are encoded
+    // with a gamma of about 0.45". Let gamma be 0.5 so we can use the sqrt
+    // (in^1/2) function
+    return Vec3(std::sqrt(color.r), std::sqrt(color.g), std::sqrt(color.b));
   }
 
  private:
