@@ -1,5 +1,6 @@
 #include <pngwriter.h>
 #include <iostream>
+#include <math.h>
 
 #include "camera.hpp"
 #include "materials/glass.hpp"
@@ -39,10 +40,15 @@ Vec3 ray_color(const Surface& surface, const Ray& r, int bounces,
   return linear_interp(white, blue, t);
 }
 
-int main(int, char**) {
-  int width = 200, height = 100, samples_per_pixel = 10;
+constexpr float radians(float degrees) {
+  return degrees / 180.0 * M_PI;
+}
 
-  Camera camera(samples_per_pixel);
+int main(int, char**) {
+  constexpr int width = 200, height = 100, samples_per_pixel = 10;
+  constexpr Camera camera(
+      /* camera */ Vec3(-1.2, 1.0, 0.5), /* looking at */ Vec3(0, 0, -1),
+      /* up */ Vec3(0, 1, 0), /* fov */ radians(75), float(width) / float(height));
 
   Rnd rnd;
   std::function<float()> rnd_float = std::bind(&Rnd::random, std::ref(rnd));
@@ -73,8 +79,8 @@ int main(int, char**) {
   pngwriter png(width, height, 0, "test.png");
   for (int y = height - 1; y >= 0; --y)
     for (int x = 0; x < width; ++x) {
-      Vec3 color = camera.avgsample_pixel_color(x, y, width, height, rnd_float,
-                                                ray_color_fn);
+      Vec3 color = camera.avgsample_pixel_color(
+          x, y, width, height, rnd_float, ray_color_fn, samples_per_pixel);
       png.plot(x, y, color.r, color.g, color.b);
     }
 
