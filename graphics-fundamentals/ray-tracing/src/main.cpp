@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "camera.hpp"
+#include "materials/glass.hpp"
 #include "materials/lambertian.hpp"
 #include "materials/metal.hpp"
 #include "rnd.hpp"
@@ -13,7 +14,7 @@ constexpr Vec3 linear_interp(const Vec3& start, const Vec3& end, float t) {
   return (1.0 - t) * start + t * end;
 }
 
-constexpr int max_ray_bounces = 4;
+constexpr int max_ray_bounces = 10;
 
 Vec3 ray_color(const Surface& surface, const Ray& r, int bounces,
                std::function<Vec3()> rnd) {
@@ -49,14 +50,20 @@ int main(int, char**) {
       std::bind(&Rnd::random_in_unit_sphere, std::ref(rnd));
 
   std::vector<std::unique_ptr<Surface>> surfaces;
+  auto matte_green =
+      std::make_shared<Lambertian>(Vec3(0.8, 0.8, 0.0), rnd_sphere);
   auto matte = std::make_shared<Lambertian>(Vec3(0.5, 0.5, 0.5), rnd_sphere);
-  auto metal = std::make_shared<Metal>(Vec3(0.5, 0.5, 0.5), /* fuzziness */ 0.4, rnd_sphere);
+  auto metal = std::make_shared<Metal>(Vec3(0.5, 0.5, 0.5), /* fuzziness */ 0.4,
+                                       rnd_sphere);
+  auto glass = std::make_shared<Glass>(1.5, rnd_float);
   surfaces.push_back(
-      std::make_unique<Sphere>(Vec3(0.0, -100.5, -1), 100.0, matte));
+      std::make_unique<Sphere>(Vec3(0.0, -100.5, -1), 100.0, matte_green));
   surfaces.push_back(
       std::make_unique<Sphere>(Vec3(0.0, 0.0, -1.1), 0.5, matte));
   surfaces.push_back(
       std::make_unique<Sphere>(Vec3(1.0, 0.0, -1.1), 0.5, metal));
+  surfaces.push_back(
+      std::make_unique<Sphere>(Vec3(-1.0, 0.0, -1.1), 0.5, glass));
   auto world = World(std::move(surfaces));
 
   std::function<Vec3(const Ray&)> ray_color_fn =
