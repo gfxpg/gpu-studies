@@ -44,9 +44,17 @@ TEST_CASE("scalar vector division", "[vec3]") {
 }
 
 TEST_CASE("vector dot product", "[vec3]") {
-  constexpr auto dot = Vec3(1.0, 2.0, 3.0).dot(Vec3(1.0, 5.0, 7.0));
+  constexpr float dot = Vec3(1.0, 2.0, 3.0).dot(Vec3(1.0, 5.0, 7.0));
 
   REQUIRE(dot == Approx(32.0f));
+}
+
+TEST_CASE("vector cross product", "[vec3]") {
+  constexpr auto cross = Vec3(1.0, 2.0, 3.0).cross(Vec3(1.0, 5.0, 7.0));
+
+  REQUIRE(cross.x == Approx(-1.0));
+  REQUIRE(cross.y == Approx(-4.0));
+  REQUIRE(cross.z == Approx(3.0));
 }
 
 TEST_CASE("vector elementwise multiplication", "[vec3]") {

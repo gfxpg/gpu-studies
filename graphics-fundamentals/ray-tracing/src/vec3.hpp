@@ -53,6 +53,12 @@ class Vec3 {
     return x * rhs.x + y * rhs.y + z * rhs.z;
   }
 
+  // a x b = (a2b3 - a3b2)i + (a3b1 - a1b3)j + (a1b2 - a2b1)k
+  constexpr Vec3 cross(Vec3 const& rhs) const {
+    return Vec3(y * rhs.z - z * rhs.y, z * rhs.x - x * rhs.z,
+                x * rhs.y - y * rhs.x);
+  }
+
   constexpr Vec3 eltwise_mul(Vec3 const& rhs) const {
     return Vec3(x * rhs.x, y * rhs.y, z * rhs.z);
   }
