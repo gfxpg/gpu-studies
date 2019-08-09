@@ -1,8 +1,5 @@
-#include <math.h>
-#include <pngwriter.h>
-#include <iostream>
-
 #include "camera.hpp"
+#include "image.hpp"
 #include "materials/glass.hpp"
 #include "materials/lambertian.hpp"
 #include "materials/metal.hpp"
@@ -65,28 +62,25 @@ int main(int, char**) {
       std::make_unique<Sphere>(Vec3(-1.0, 0.0, -1.1), 0.5, glass));
   auto world = World(std::move(surfaces));
 
-  std::vector<Vec3> img(height * width);
+  Image image(width, height, "test.ppm");
 
 #pragma omp parallel
   {
     // RNG needs to be thread-local
     Rnd rnd;
     std::function<float()> rnd_float = std::bind(&Rnd::random, std::ref(rnd));
-    std::function<Vec3(const Ray&)> ray_color_fn = std::bind(
-        ray_color, std::cref((Surface&)world), std::placeholders::_1, 0, rnd_float);
+    std::function<Vec3(const Ray&)> ray_color_fn =
+        std::bind(ray_color, std::cref((Surface&)world), std::placeholders::_1,
+                  0, rnd_float);
 
 #pragma omp for collapse(2)
-    for (int y = height - 1; y >= 0; --y)
+    for (int y = 0; y < height; ++y)
       for (int x = 0; x < width; ++x) {
-        img[x * height + y] = camera.avgsample_pixel_color(
+        Vec3 color = camera.avgsample_pixel_color(
             x, y, width, height, rnd_float, ray_color_fn, samples_per_pixel);
+        image.set_pixel(x, y, color);
       }
   }
 
-  pngwriter png(width, height, 0, "test.png");
-  for (int y = height - 1; y >= 0; --y)
-    for (int x = 0; x < width; ++x)
-      png.plot(x, y, img[x * height + y].r, img[x * height + y].g,
-               img[x * height + y].b);
-  png.close();
+  image.write_binary_ppm();
 }
