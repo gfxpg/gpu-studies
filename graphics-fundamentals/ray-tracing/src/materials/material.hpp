@@ -11,5 +11,6 @@ struct ScatteredRay {
 class Material {
  public:
   virtual std::optional<ScatteredRay> scatter(
-      const Ray& r, const SurfaceHit& surface_hit) const = 0;
+      const Ray& r, const SurfaceHit& surface_hit,
+      std::function<float()> rnd) const = 0;
 };

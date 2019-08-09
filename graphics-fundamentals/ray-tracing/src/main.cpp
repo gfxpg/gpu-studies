@@ -18,7 +18,7 @@ constexpr Vec3 linear_interp(const Vec3& start, const Vec3& end, float t) {
 constexpr int max_ray_bounces = 10;
 
 Vec3 ray_color(const Surface& surface, const Ray& r, int bounces,
-               std::function<Vec3()> rnd) {
+               std::function<float()> rnd) {
   const Vec3 white = Vec3(1.0, 1.0, 1.0);
   const Vec3 blue = Vec3(0.5, 0.7, 1.0);
 
@@ -26,7 +26,7 @@ Vec3 ray_color(const Surface& surface, const Ray& r, int bounces,
   if (hit_result) {
     auto [hit, material] = *hit_result;
     if (bounces < max_ray_bounces) {
-      auto scatter_result = material->scatter(r, hit);
+      auto scatter_result = material->scatter(r, hit, rnd);
       if (scatter_result) {
         return scatter_result->attenuation.eltwise_mul(
             ray_color(surface, scatter_result->ray, bounces + 1, rnd));
@@ -47,20 +47,14 @@ int main(int, char**) {
   constexpr Camera camera(
       /* camera */ Vec3(-1.2, 1.0, 0.5), /* looking at */ Vec3(0, 0, -1.1),
       /* up */ Vec3(0, 1, 0), /* fov */ radians(75),
-      float(width) / float(height), /* aperture */ 1.0/8.0);
-
-  Rnd rnd;
-  std::function<float()> rnd_float = std::bind(&Rnd::random, std::ref(rnd));
-  std::function<Vec3()> rnd_sphere =
-      std::bind(&Rnd::random_in_unit_sphere, std::ref(rnd));
+      float(width) / float(height), /* aperture */ 1.0 / 8.0);
 
   std::vector<std::unique_ptr<Surface>> surfaces;
-  auto matte_green =
-      std::make_shared<Lambertian>(Vec3(0.8, 0.8, 0.0), rnd_sphere);
-  auto matte = std::make_shared<Lambertian>(Vec3(0.5, 0.5, 0.5), rnd_sphere);
-  auto metal = std::make_shared<Metal>(Vec3(0.5, 0.5, 0.5), /* fuzziness */ 0.4,
-                                       rnd_sphere);
-  auto glass = std::make_shared<Glass>(1.5, rnd_float);
+  auto matte_green = std::make_shared<Lambertian>(Vec3(0.8, 0.8, 0.0));
+  auto matte = std::make_shared<Lambertian>(Vec3(0.5, 0.5, 0.5));
+  auto metal =
+      std::make_shared<Metal>(Vec3(0.5, 0.5, 0.5), /* fuzziness */ 0.4);
+  auto glass = std::make_shared<Glass>(1.5);
   surfaces.push_back(
       std::make_unique<Sphere>(Vec3(0.0, -100.5, -1), 100.0, matte_green));
   surfaces.push_back(
@@ -71,17 +65,28 @@ int main(int, char**) {
       std::make_unique<Sphere>(Vec3(-1.0, 0.0, -1.1), 0.5, glass));
   auto world = World(std::move(surfaces));
 
-  std::function<Vec3(const Ray&)> ray_color_fn =
-      std::bind(ray_color, std::cref((Surface&)world), std::placeholders::_1, 0,
-                rnd_sphere);
+  std::vector<Vec3> img(height * width);
+
+#pragma omp parallel
+  {
+    // RNG needs to be thread-local
+    Rnd rnd;
+    std::function<float()> rnd_float = std::bind(&Rnd::random, std::ref(rnd));
+    std::function<Vec3(const Ray&)> ray_color_fn = std::bind(
+        ray_color, std::cref((Surface&)world), std::placeholders::_1, 0, rnd_float);
+
+#pragma omp for collapse(2)
+    for (int y = height - 1; y >= 0; --y)
+      for (int x = 0; x < width; ++x) {
+        img[x * height + y] = camera.avgsample_pixel_color(
+            x, y, width, height, rnd_float, ray_color_fn, samples_per_pixel);
+      }
+  }
 
   pngwriter png(width, height, 0, "test.png");
   for (int y = height - 1; y >= 0; --y)
-    for (int x = 0; x < width; ++x) {
-      Vec3 color = camera.avgsample_pixel_color(
-          x, y, width, height, rnd_float, ray_color_fn, samples_per_pixel);
-      png.plot(x, y, color.r, color.g, color.b);
-    }
-
+    for (int x = 0; x < width; ++x)
+      png.plot(x, y, img[x * height + y].r, img[x * height + y].g,
+               img[x * height + y].b);
   png.close();
 }

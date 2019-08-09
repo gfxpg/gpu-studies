@@ -4,11 +4,11 @@
 
 class Glass : public Material {
  public:
-  Glass(float refraction_idx, std::function<float()> random)
-      : refraction_idx(refraction_idx), random(random) {}
+  Glass(float refraction_idx) : refraction_idx(refraction_idx) {}
 
   virtual std::optional<ScatteredRay> scatter(
-      const Ray& r, const SurfaceHit& surface_hit) const {
+      const Ray& r, const SurfaceHit& surface_hit,
+      std::function<float()> rnd) const {
     static constexpr Vec3 attenuation = Vec3(1.0, 1.0, 1.0);
 
     Vec3 reflected = reflect_ray(r.direction(), surface_hit.normal);
@@ -31,7 +31,7 @@ class Glass : public Material {
       // of the incoming (incident) light. Rays that are not reflected are
       // refracted.
       float reflectance = schlick(cos);
-      if (random() >= reflectance)
+      if (rnd() >= reflectance)
         return {{Ray(surface_hit.p, *refracted), attenuation}};
     }
     return {{Ray(surface_hit.p, reflected), attenuation}};
@@ -68,5 +68,4 @@ class Glass : public Material {
 
  private:
   float refraction_idx;
-  std::function<float()> random;
 };

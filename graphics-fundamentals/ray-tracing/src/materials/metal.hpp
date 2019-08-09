@@ -4,20 +4,19 @@
 
 class Metal : public Material {
  public:
-  Metal(Vec3 albedo, float fuzziness,
-        std::function<Vec3()> random_in_unit_sphere)
-      : albedo(albedo),
-        fuzziness(std::min<float>(1.0, fuzziness)),
-        random_in_unit_sphere(random_in_unit_sphere) {}
+  Metal(Vec3 albedo, float fuzziness)
+      : albedo(albedo), fuzziness(std::min<float>(1.0, fuzziness)) {}
 
   virtual std::optional<ScatteredRay> scatter(
-      const Ray& r, const SurfaceHit& surface_hit) const {
+      const Ray& r, const SurfaceHit& surface_hit,
+      std::function<float()> rnd) const {
     Vec3 reflected =
         reflect_ray(r.direction().unit_vector(), surface_hit.normal);
     // By randomizing the reflected direction within a small sphere, we can
     // control how fuzzy the reflections appear.
     Ray scattered =
-        Ray(surface_hit.p, reflected + fuzziness * random_in_unit_sphere());
+        Ray(surface_hit.p,
+            reflected + fuzziness * Rnd::random_in_unit_sphere(rnd));
 
     if (scattered.direction().dot(surface_hit.normal) > 0)
       return {{scattered, albedo}};
