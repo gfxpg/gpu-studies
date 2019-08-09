@@ -19,6 +19,14 @@ class Rnd {
     return p;
   }
 
+  static Vec3 random_in_unit_disk(std::function<float()> rnd) {
+    Vec3 p;
+    do {
+      p = 2.0 * Vec3(rnd(), rnd(), 0) - Vec3(1.0, 1.0, 0.0);
+    } while (p.dot(p) >= 1.0);
+    return p;
+  }
+
  private:
   std::mt19937 mt_rnd;
   std::uniform_real_distribution<float> distr;

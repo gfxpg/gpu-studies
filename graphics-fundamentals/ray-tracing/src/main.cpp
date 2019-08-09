@@ -1,6 +1,6 @@
+#include <math.h>
 #include <pngwriter.h>
 #include <iostream>
-#include <math.h>
 
 #include "camera.hpp"
 #include "materials/glass.hpp"
@@ -40,15 +40,14 @@ Vec3 ray_color(const Surface& surface, const Ray& r, int bounces,
   return linear_interp(white, blue, t);
 }
 
-constexpr float radians(float degrees) {
-  return degrees / 180.0 * M_PI;
-}
+constexpr float radians(float degrees) { return degrees / 180.0 * M_PI; }
 
 int main(int, char**) {
   constexpr int width = 200, height = 100, samples_per_pixel = 10;
   constexpr Camera camera(
-      /* camera */ Vec3(-1.2, 1.0, 0.5), /* looking at */ Vec3(0, 0, -1),
-      /* up */ Vec3(0, 1, 0), /* fov */ radians(75), float(width) / float(height));
+      /* camera */ Vec3(-1.2, 1.0, 0.5), /* looking at */ Vec3(0, 0, -1.1),
+      /* up */ Vec3(0, 1, 0), /* fov */ radians(75),
+      float(width) / float(height), /* aperture */ 1.0/8.0);
 
   Rnd rnd;
   std::function<float()> rnd_float = std::bind(&Rnd::random, std::ref(rnd));
