@@ -9,7 +9,7 @@ mkdir vendor \
 Create a code object from the assembly file:
 
 ```
-/opt/rocm/hcc/bin/llvm-mc -mattr=-code-object-v3 -triple amdgcn-amd-amdhsa -mcpu=gfx900 -filetype=obj test.s -o test.o
+/opt/rocm/hcc/bin/llvm-mc -mattr=+code-object-v3 -triple amdgcn-amd-amdhsa -mcpu=gfx900 -filetype=obj test.s -o test.o
 /opt/rocm/hcc/bin/clang -target amdgcn--amdhsa test.o -o test.co
 ```
 
