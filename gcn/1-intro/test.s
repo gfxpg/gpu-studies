@@ -17,8 +17,8 @@ hello_world:
   ; v1 is the workitem X index
   ; v2 is the workitem Y index
 
-  s_load_dword s6, s[4:5], 0x4 ; s6 <- workgroup size X
-  s_load_dword s7, s[4:5], 0x6 ; s7 <- workgroup size Y
+  s_load_dword s6, s[0:1], 0x4 ; s6 <- workgroup size X
+  s_load_dword s7, s[0:1], 0x6 ; s7 <- workgroup size Y
   s_waitcnt lgkmcnt(0)
   s_and_b32 s6, s6, 0xffff ; keep only the lower 16 bits
   s_and_b32 s7, s7, 0xffff
@@ -29,7 +29,7 @@ hello_world:
   v_add_u32 v0, s4, v0 ; v0 <- global X id
   v_add_u32 v1, s5, v1 ; v1 <- global Y id
 
-  s_load_dword s6, s[4:5], 0x18 ; s6 <- grid size Y
+  s_load_dword s6, s[0:1], 0x18 ; s6 <- grid size Y
   s_waitcnt lgkmcnt(0)
 
   ; index = 3 * (x * grid size y + y)
@@ -40,9 +40,17 @@ hello_world:
   s_load_dwordx2 s[2:3], s[2:3] 0x0 ; buffer pointer
   s_waitcnt lgkmcnt(0)
 
-  ; ..? magic
+  global_load_dwordx3 v[2:4], v[0:1], s[2:3]
+  s_waitcnt lgkmcnt(0)
 
-  flat_store_dword v[1:2], v0
+  s_mov_b32 s0, 0.3
+  v_mul_f32 v2, v2, s0 ; r *= 0.3
+  s_mov_b32 s0, 0.59
+  v_mul_f32 v3, v3, s0 ; g *= 0.59
+  s_mov_b32 s0, 0.11
+  v_mul_f32 v4, v4, s0 ; b *= 0.11
+
+  global_store_dwordx3 v[0:1], v[2:4], s[2:3]
   s_endpgm
 .Lfunc_end0:
   .size   hello_world, .Lfunc_end0-hello_world
