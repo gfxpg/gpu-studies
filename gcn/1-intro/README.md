@@ -3,7 +3,8 @@ Download dependencies:
 ```
 mkdir vendor \
   && curl https://raw.githubusercontent.com/ROCm-Developer-Tools/LLVM-AMDGPU-Assembler-Extra/master/examples/common/dispatch.cpp -o vendor/dispatch.cpp \
-  && curl https://raw.githubusercontent.com/ROCm-Developer-Tools/LLVM-AMDGPU-Assembler-Extra/master/examples/common/dispatch.hpp -o vendor/dispatch.hpp
+  && curl https://raw.githubusercontent.com/ROCm-Developer-Tools/LLVM-AMDGPU-Assembler-Extra/master/examples/common/dispatch.hpp -o vendor/dispatch.hpp \
+  && curl https://raw.githubusercontent.com/dtschump/CImg/master/CImg.h -o vendor/CImg.h
 ```
 
 Create a code object from the assembly file:
