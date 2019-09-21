@@ -24,6 +24,7 @@ class HsaRunner {
                         const std::string& symbol_name);
   bool setup_dispatch_packet(const KernelParams& params);
   bool dispatch_kernel();
+  HsaMemory& memory() { return _mem; }
 
  private:
   HsaMemory _mem;
