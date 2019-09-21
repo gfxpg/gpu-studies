@@ -1,28 +1,18 @@
+#include "hsa_utils.hpp"
 #include <fstream>
 #include <iostream>
-#include "hsa_utils.hpp"
 #include "hsa_memory.hpp"
 
 bool hsa_error(const std::string& message, hsa_status_t status) {
   const char* info = 0;
-  if (status != HSA_STATUS_SUCCESS)
-    hsa_status_string(status, &info);
+  if (status != HSA_STATUS_SUCCESS) hsa_status_string(status, &info);
   std::cout << message << ": " << (info ? info : "unknown error") << std::endl;
   return false;
 }
 
-hsa_status_t find_gpu_device(hsa_agent_t agent, void* data) {
-  if (data == NULL) return HSA_STATUS_ERROR_INVALID_ARGUMENT;
-  hsa_device_type_t dev;
-  hsa_status_t status = hsa_agent_get_info(agent, HSA_AGENT_INFO_DEVICE, &dev);
-  if (status == HSA_STATUS_SUCCESS && dev == HSA_DEVICE_TYPE_GPU) {
-    *((hsa_agent_t*)data) = agent;
-    return HSA_STATUS_INFO_BREAK;
-  }
-  return HSA_STATUS_SUCCESS;
-}
-
-bool load_code_object(const std::string& path, std::function<void*(size_t)> alloc, hsa_code_object_t* co) {
+bool load_code_object(const std::string& path,
+                      std::function<void*(size_t)> alloc,
+                      hsa_code_object_t* co) {
   std::ifstream in(path.c_str(), std::ios::binary | std::ios::ate);
   if (!in) {
     std::cout << "Failed to load code object from " << path << std::endl;
@@ -44,4 +34,17 @@ bool load_code_object(const std::string& path, std::function<void*(size_t)> allo
     return false;
   }
   return true;
+}
+
+hsa_status_t find_gpu_device(hsa_agent_t agent, void* data) {
+  if (data == NULL) return HSA_STATUS_ERROR_INVALID_ARGUMENT;
+  hsa_device_type_t dev;
+  hsa_status_t status = hsa_agent_get_info(agent, HSA_AGENT_INFO_DEVICE, &dev);
+  if (status == HSA_STATUS_SUCCESS) {
+    if (dev == HSA_DEVICE_TYPE_GPU)
+      ((HsaAgentEnumeration*)data)->gpu = agent;
+    else if (dev == HSA_DEVICE_TYPE_CPU)
+      ((HsaAgentEnumeration*)data)->cpu = agent;
+  }
+  return HSA_STATUS_SUCCESS;
 }

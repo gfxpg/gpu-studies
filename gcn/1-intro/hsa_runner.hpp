@@ -16,7 +16,8 @@ struct KernelParams {
 class HsaRunner {
  public:
   HsaRunner() : _queue_size(0), _queue(0) {
-    _agent.handle = 0;
+    _cpu_agent.handle = 0;
+    _gpu_agent.handle = 0;
     _signal.handle = 0;
   }
   bool init();
@@ -28,7 +29,8 @@ class HsaRunner {
 
  private:
   HsaMemory _mem;
-  hsa_agent_t _agent;
+  hsa_agent_t _gpu_agent;
+  hsa_agent_t _cpu_agent;
   uint32_t _queue_size;
   hsa_queue_t* _queue;
   hsa_signal_t _signal;

@@ -8,22 +8,25 @@ bool HsaRunner::init() {
   hsa_status_t status = hsa_init();
   if (status != HSA_STATUS_SUCCESS) return hsa_error("hsa_init failed", status);
 
-  status = hsa_iterate_agents(find_gpu_device, &_agent);
-  if (status != HSA_STATUS_SUCCESS || !_agent.handle)
-    return hsa_error("Unable to find a suitable GPU", status);
+  HsaAgentEnumeration agents;
+  status = hsa_iterate_agents(find_gpu_device, &agents);
+  if (status != HSA_STATUS_SUCCESS || !agents.cpu.handle || !agents.gpu.handle)
+    return hsa_error("Unable to find suitable HSA agents", status);
+  _gpu_agent = agents.gpu;
+  _cpu_agent = agents.cpu;
 
   char agent_name[64];
-  status = hsa_agent_get_info(_agent, HSA_AGENT_INFO_NAME, agent_name);
+  status = hsa_agent_get_info(_gpu_agent, HSA_AGENT_INFO_NAME, agent_name);
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error("Failed to get HSA_AGENT_INFO_NAME", status);
   std::cout << "Using agent: " << agent_name << std::endl;
 
   status =
-      hsa_agent_get_info(_agent, HSA_AGENT_INFO_QUEUE_MAX_SIZE, &_queue_size);
+      hsa_agent_get_info(_gpu_agent, HSA_AGENT_INFO_QUEUE_MAX_SIZE, &_queue_size);
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error("Failed to get HSA_AGENT_INFO_QUEUE_MAX_SIZE", status);
 
-  status = hsa_queue_create(_agent, _queue_size, HSA_QUEUE_TYPE_MULTI, NULL,
+  status = hsa_queue_create(_gpu_agent, _queue_size, HSA_QUEUE_TYPE_MULTI, NULL,
                             NULL, UINT32_MAX, UINT32_MAX, &_queue);
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error("hsa_queue_create failed", status);
@@ -32,7 +35,7 @@ bool HsaRunner::init() {
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error("hsa_signal_create failed", status);
 
-  return _mem.setup_memory_regions(_agent);
+  return _mem.setup_memory_regions(_gpu_agent);
 }
 
 bool HsaRunner::setup_executable(const std::string& code_object_path,
@@ -49,7 +52,7 @@ bool HsaRunner::setup_executable(const std::string& code_object_path,
     return hsa_error("hsa_executable_create failed", status);
 
   status =
-      hsa_executable_load_code_object(_executable, _agent, _code_object, NULL);
+      hsa_executable_load_code_object(_executable, _gpu_agent, _code_object, NULL);
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error("hsa_executable_load_code_object failed", status);
 
@@ -59,7 +62,7 @@ bool HsaRunner::setup_executable(const std::string& code_object_path,
 
   hsa_executable_symbol_t _symbol;
   status = hsa_executable_get_symbol(_executable, NULL, symbol_name.c_str(),
-                                     _agent, 0, &_symbol);
+                                     _gpu_agent, 0, &_symbol);
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error("hsa_executable_get_symbol failed", status);
 
