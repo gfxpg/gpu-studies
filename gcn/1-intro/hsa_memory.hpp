@@ -17,6 +17,19 @@ class HsaBuffer {
   bool allocated_on_agent() const { return _agent_ptr != NULL; }
   size_t size() const { return _size; }
 
+  bool copy_from_device(hsa_agent_t cpu_agent) {
+    hsa_status_t status = hsa_memory_assign_agent(_agent_ptr, cpu_agent,
+                                                  HSA_ACCESS_PERMISSION_RW);
+    if (status != HSA_STATUS_SUCCESS)
+      return hsa_error("hsa_memory_assign_agent failed", status);
+
+    status = hsa_memory_copy(_system_ptr, _agent_ptr, _size);
+    if (status != HSA_STATUS_SUCCESS)
+      return hsa_error("hsa_memory_copy failed", status);
+
+    return true;
+  }
+
  private:
   size_t _size;
   T* _system_ptr;

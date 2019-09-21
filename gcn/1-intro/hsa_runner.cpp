@@ -21,8 +21,8 @@ bool HsaRunner::init() {
     return hsa_error("Failed to get HSA_AGENT_INFO_NAME", status);
   std::cout << "Using agent: " << agent_name << std::endl;
 
-  status =
-      hsa_agent_get_info(_gpu_agent, HSA_AGENT_INFO_QUEUE_MAX_SIZE, &_queue_size);
+  status = hsa_agent_get_info(_gpu_agent, HSA_AGENT_INFO_QUEUE_MAX_SIZE,
+                              &_queue_size);
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error("Failed to get HSA_AGENT_INFO_QUEUE_MAX_SIZE", status);
 
@@ -51,8 +51,8 @@ bool HsaRunner::setup_executable(const std::string& code_object_path,
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error("hsa_executable_create failed", status);
 
-  status =
-      hsa_executable_load_code_object(_executable, _gpu_agent, _code_object, NULL);
+  status = hsa_executable_load_code_object(_executable, _gpu_agent,
+                                           _code_object, NULL);
   if (status != HSA_STATUS_SUCCESS)
     return hsa_error("hsa_executable_load_code_object failed", status);
 
@@ -111,12 +111,27 @@ bool HsaRunner::dispatch_kernel() {
   uint16_t dim = 1;
   if (_dispatch_packet->grid_size_y > 1) dim = 2;
   if (_dispatch_packet->grid_size_z > 1) dim = 3;
-  _dispatch_packet->group_segment_size =
-      _group_static_size + _group_dynamic_size;
+  _dispatch_packet->group_segment_size = _group_static_size;
   uint16_t setup = dim << HSA_KERNEL_DISPATCH_PACKET_SETUP_DIMENSIONS;
   uint32_t header32 = header | (setup << 16);
   __atomic_store_n((uint32_t*)_dispatch_packet, header32, __ATOMIC_RELEASE);
   hsa_signal_store_relaxed(_queue->doorbell_signal, _dispatch_packet_index);
 
+  return true;
+}
+
+bool HsaRunner::wait(uint64_t timeout_sec) {
+  clock_t beg = clock();
+  hsa_signal_value_t result;
+  do {
+    result = hsa_signal_wait_acquire(_signal, HSA_SIGNAL_CONDITION_EQ, 0, ~0ULL,
+                                     HSA_WAIT_STATE_ACTIVE);
+    clock_t clocks = clock() - beg;
+    if (clocks > (clock_t)timeout_sec * CLOCKS_PER_SEC) {
+      std::cout << "Kernel execution timed out, elapsed time: " << (long)clocks
+                << std::endl;
+      return false;
+    }
+  } while (result != 0);
   return true;
 }

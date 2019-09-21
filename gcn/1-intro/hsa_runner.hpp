@@ -25,7 +25,9 @@ class HsaRunner {
                         const std::string& symbol_name);
   bool setup_dispatch_packet(const KernelParams& params);
   bool dispatch_kernel();
+  bool wait(uint64_t timeout_sec);
   HsaMemory& memory() { return _mem; }
+  hsa_agent_t cpu_agent() const { return _cpu_agent; }
 
  private:
   HsaMemory _mem;
@@ -40,5 +42,4 @@ class HsaRunner {
   hsa_code_object_t _code_object;
   hsa_executable_t _executable;
   uint32_t _group_static_size;
-  uint32_t _group_dynamic_size;
 };

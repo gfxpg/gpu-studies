@@ -40,19 +40,15 @@ int main(int argc, const char** argv) {
 
   assert(runner.setup_dispatch_packet(params));
   assert(runner.dispatch_kernel());
+  assert(runner.wait(120));
+  assert(output->copy_from_device(runner.cpu_agent()));
 
-  // if (!CopyFrom(_out)) {
-  //   output << "Error: failed to copy from local" << std::endl;
-  //   return false;
+  for (int x = 0; x < img.width(); ++x)
+    for (int y = 0; y < img.height(); ++y) {
+      img(x, y, 0, 0) = (*output)[(x + y * img.width()) * 3 + 0];
+      img(x, y, 0, 1) = (*output)[(x + y * img.width()) * 3 + 1];
+      img(x, y, 0, 2) = (*output)[(x + y * img.width()) * 3 + 2];
+    }
 
-  // for (int x = 0; x < _img.width(); ++x)
-  //   for (int y = 0; y < _img.height(); ++y) {
-  //     _img(x, y, 0, 0) = _out->Data<float>((x + y * _img.width()) * 3 + 0);
-  //     _img(x, y, 0, 1) = _out->Data<float>((x + y * _img.width()) * 3 + 1);
-  //     _img(x, y, 0, 2) = _out->Data<float>((x + y * _img.width()) * 3 + 2);
-  //   }
-
-  // _img.save(OUTPUT_IMAGE);
-
-  // return true;
+  img.save(OUTPUT_IMAGE);
 }
