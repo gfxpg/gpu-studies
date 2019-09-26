@@ -30,6 +30,14 @@ class HsaBuffer {
     return true;
   }
 
+  bool copy_to_device() {
+    hsa_status_t status = hsa_memory_copy(_agent_ptr, _system_ptr, _size);
+    if (status != HSA_STATUS_SUCCESS)
+      return hsa_error("hsa_memory_copy failed", status);
+
+    return true;
+  }
+
  private:
   size_t _size;
   T* _system_ptr;
