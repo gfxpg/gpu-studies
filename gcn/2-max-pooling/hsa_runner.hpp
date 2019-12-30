@@ -23,6 +23,7 @@ class HsaRunner
     _gpu_agent.handle = 0;
     _signal.handle = 0;
   }
+  ~HsaRunner();
   bool init();
   bool setup_executable(const std::string& code_object_path,
                         const std::string& symbol_name);

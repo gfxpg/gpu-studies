@@ -4,6 +4,11 @@
 #include "hsa_runner.hpp"
 #include "hsa_utils.hpp"
 
+HsaRunner::~HsaRunner()
+{
+  hsa_shut_down();
+}
+
 bool HsaRunner::init()
 {
   hsa_status_t status = hsa_init();

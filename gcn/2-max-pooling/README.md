@@ -6,6 +6,7 @@ cd include
 curl -O https://raw.githubusercontent.com/vsrad/radeon-asm-tools/77377590a34b4ce00755a55a3673cfedb6c6c8ed/Example/VectorAddProjectExample/gfx9/include/common.inc
 curl -O https://raw.githubusercontent.com/vsrad/radeon-asm-tools/77377590a34b4ce00755a55a3673cfedb6c6c8ed/Example/VectorAddProjectExample/gfx9/include/inst_wrappers.inc
 curl -O https://raw.githubusercontent.com/vsrad/radeon-asm-tools/77377590a34b4ce00755a55a3673cfedb6c6c8ed/Example/VectorAddProjectExample/gfx9/include/gpr_alloc.inc
+curl -O https://raw.githubusercontent.com/vsrad/debug-plug-hsa-intercept/68ef9aae617f5711ae6a5ad651c2086589f75757/tests/fixtures/breakpoint.pl
 ```
 
 2. Compile the kernel and the host executable:
