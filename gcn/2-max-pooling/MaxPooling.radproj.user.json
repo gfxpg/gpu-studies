@@ -1,0 +1,96 @@
+{
+  "DebuggerOptions": {
+    "Watches": [
+      {
+        "Name": "v[tid]",
+        "Type": "Uint",
+        "IsAVGPR": false
+      },
+      {
+        "Name": "s[c_kh]",
+        "Type": "Uint",
+        "IsAVGPR": false
+      },
+      {
+        "Name": "v[max]",
+        "Type": "Float",
+        "IsAVGPR": false
+      }
+    ],
+    "Counter": 0,
+    "AppArgs": "",
+    "BreakArgs": ""
+  },
+  "VisualizerOptions": {
+    "ShowSystemVariable": false,
+    "MaskLanes": false,
+    "NDRange3D": false,
+    "LaneGrouping": 4,
+    "CheckMagicNumber": true,
+    "MagicNumber": "0x7777777",
+    "ShowAppArgs": false,
+    "ShowBrkArgs": false
+  },
+  "VisualizerColumnStyling": {
+    "VisibleColumns": "0-63",
+    "HighlightRegions": []
+  },
+  "ActiveProfile": "Default",
+  "Profiles": {
+    "Default": {
+      "General": {
+        "DeployDirectory": "/remote",
+        "RemoteMachine": "?.?.?.?",
+        "Port": 9339,
+        "AutosaveSource": 1,
+        "CopySources": true,
+        "AdditionalSources": ""
+      },
+      "Debugger": {
+        "Executable": "bash",
+        "Arguments": "debug.sh -l $(RadBreakLine) -f max_pooling.s -w \"$(RadWatches)\" -t $(RadCounter) -o $(RadDebugDataOutputPath)",
+        "WorkingDirectory": "$(RadDeployDir)",
+        "OutputPath": "$(RadDebugWorkDir)/tmp/debug_buffer",
+        "BinaryOutput": true,
+        "OutputOffset": 0,
+        "ParseValidWatches": false,
+        "ValidWatchesFilePath": "",
+        "RunAsAdmin": false,
+        "TimeoutSecs": 0
+      },
+      "Preprocessor": {
+        "Executable": "",
+        "Arguments": "",
+        "WorkingDirectory": "$(RadDeployDir)",
+        "OutputPath": "",
+        "LocalOutputCopyPath": "",
+        "LineMarker": ""
+      },
+      "Disassembler": {
+        "Executable": "",
+        "Arguments": "",
+        "WorkingDirectory": "",
+        "OutputPath": "",
+        "LocalOutputCopyPath": "",
+        "LineMarker": ""
+      },
+      "Profiler": {
+        "Executable": "",
+        "Arguments": "",
+        "WorkingDirectory": "",
+        "OutputPath": "",
+        "ViewerExecutable": "",
+        "ViewerArguments": "",
+        "LocalOutputCopyPath": "",
+        "RunAsAdmin": false
+      },
+      "Build": {
+        "RunPreprocessor": false,
+        "RunDisassembler": false,
+        "Executable": "",
+        "Arguments": "",
+        "WorkingDirectory": ""
+      }
+    }
+  }
+}

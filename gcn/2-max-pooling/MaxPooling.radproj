@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <CustomProjectExtensionsPath>$(LocalAppData)\CustomProjectSystems\RADProject\</CustomProjectExtensionsPath>
+    <ProjectGuid>aabd62e6-6b76-4fcc-8708-5b97a989e662</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="$(CustomProjectExtensionsPath)RADProject.props" />
+  <Import Project="$(CustomProjectExtensionsPath)RADProject.targets" />
+</Project>

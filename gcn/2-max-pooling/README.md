@@ -14,3 +14,19 @@ curl -O https://raw.githubusercontent.com/vsrad/debug-plug-hsa-intercept/68ef9aa
 ```
 make
 ```
+
+3. Run it:
+
+```
+./max_pooling
+```
+
+## Debugging
+
+1. Download and build [libplugintercept.so](https://github.com/vsrad/debug-plug-hsa-intercept) on your remote machine
+
+2. Open *MaxPooling.sln* in Visual Studio with [Radeon Asm Tools](https://github.com/vsrad/radeon-asm-tools) installed
+
+3. Edit *debug.sh*: replace `HSA_TOOLS_LIB` export with the path on the remote machine
+
+4. Tailor the Visual Studio profile (*Tools -> RAD Debug -> Options*) to your remote machine
